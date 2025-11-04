@@ -3,45 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Quantidade por Local</title>
-    <!-- Carregando Tailwind CSS para estilização moderna e responsiva -->
+    <title>Analisador de Quantidade por Local - Sistema Avançado</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Definindo a fonte padrão e ajustes visuais */
-        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
-        textarea {
-            height: 250px; 
-            @apply shadow-inner;
-        }
-        /* Responsividade da tabela */
-        @media (max-width: 640px) {
-            .responsive-table th, .responsive-table td {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-                font-size: 0.75rem; /* extra small */
-            }
-        }
-        .table-container { max-height: 700px; } /* Altura máxima para rolagem na tabela */
-
-        /* Estilos do Modal */
-        .modal {
-            transition: opacity 0.25s ease;
-        }
-        .modal-content {
-            transition: transform 0.25s ease;
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
         
+        textarea {
+            height: 250px; 
+            transition: all 0.3s ease;
+        }
+        
+        textarea:focus {
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Animação de Loading */
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #10b981;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Skeleton Loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Cards com hover melhorado */
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Badge de Quantidade */
+        .qty-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Barra de Progresso Visual */
+        .progress-bar {
+            position: relative;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            border-radius: 9999px;
+        }
+
+        /* Modal melhorado */
+        .modal {
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scrollbar customizada */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #10b981;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #059669;
+        }
+
+        /* Search box com animação */
+        .search-box {
+            transition: all 0.3s ease;
+        }
+
+        .search-box:focus-within {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        /* Badges de Status */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: #1f2937;
+            color: white;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Responsividade melhorada */
+        @media (max-width: 640px) {
+            .qty-badge {
+                min-width: 50px;
+                height: 50px;
+                font-size: 1.25rem;
+            }
+            
+            textarea {
+                height: 180px;
+            }
+        }
+
+        /* Fade in animation */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Highlight effect */
+        .highlight {
+            background: linear-gradient(120deg, #fef3c7 0%, #fde68a 100%);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+        }
     </style>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'primary': '#10b981', /* Esmeralda */
+                        'primary': '#10b981',
                         'primary-dark': '#059669',
-                        'inventario': '#3b82f6', /* Azul */
-                        'sistema': '#f97316', /* Laranja */
-                        'export': '#d946ef', /* Fúcsia */
+                        'inventario': '#3b82f6',
+                        'sistema': '#f97316',
+                        'export': '#d946ef',
+                        'success': '#22c55e',
+                        'warning': '#f59e0b',
+                        'danger': '#ef4444',
                     }
                 }
             }
@@ -50,182 +216,378 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
-            Analisador de Quantidade por Local 📊
-        </h1>
-        <p class="text-gray-600 mb-6">
-            Cole os dados para auditar a **contagem total de itens por local**. O sistema mostrará as diferenças e permitirá clicar para ver os detalhes.
-        </p>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex items-center justify-center">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-white text-lg font-semibold">Processando dados...</p>
+            <p class="text-gray-300 text-sm mt-2">Isso pode levar alguns segundos</p>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-2xl fade-in">
+        <!-- Header melhorado -->
+        <div class="mb-8 border-b-4 border-primary pb-4">
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2 flex items-center gap-3">
+                <span class="text-5xl">📊</span>
+                Analisador de Quantidade por Local
+            </h1>
+            <p class="text-gray-600 text-lg">
+                Sistema inteligente de auditoria de inventário com análise em tempo real
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <span class="status-badge bg-green-100 text-green-700">✓ Comparação Automática</span>
+                <span class="status-badge bg-blue-100 text-blue-700">✓ Filtros Avançados</span>
+                <span class="status-badge bg-purple-100 text-purple-700">✓ Exportação CSV</span>
+            </div>
+        </div>
+
+        <!-- Contadores em tempo real -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border-2 border-blue-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-blue-600 mb-1">INVENTÁRIO</p>
+                        <p id="count-inventario" class="text-3xl font-bold text-blue-700">0</p>
+                        <p class="text-xs text-blue-600 mt-1">linhas carregadas</p>
+                    </div>
+                    <div class="text-5xl opacity-20">📋</div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border-2 border-orange-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-orange-600 mb-1">SISTEMA</p>
+                        <p id="count-sistema" class="text-3xl font-bold text-orange-700">0</p>
+                        <p class="text-xs text-orange-600 mt-1">linhas carregadas</p>
+                    </div>
+                    <div class="text-5xl opacity-20">⚙️</div>
+                </div>
+            </div>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <!-- Inventário (Fonte) -->
-            <div>
-                <label for="list-inventario" class="block text-lg font-semibold text-inventario mb-2 flex items-center">
-                    <span class="mr-2">📋</span>
-                    1. Dados do Inventário (Fonte da Verdade)
+            <!-- Inventário -->
+            <div class="group">
+                <label for="list-inventario" class="block text-lg font-bold text-inventario mb-3 flex items-center gap-2">
+                    <span class="text-2xl">📋</span>
+                    <span>Dados do Inventário</span>
+                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Local, Item">ℹ️</span>
                 </label>
-                <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Local, Item
-                </p>
-                <textarea id="list-inventario" class="w-full p-3 border border-inventario rounded-lg focus:ring-inventario focus:border-inventario transition duration-150" placeholder="Cole aqui os dados do Inventário, incluindo o cabeçalho..."></textarea>
-                <span id="count-inventario" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Inventário: 0</span>
+                <div class="relative">
+                    <textarea 
+                        id="list-inventario" 
+                        class="w-full p-4 border-2 border-inventario rounded-xl focus:ring-2 focus:ring-inventario focus:border-inventario transition duration-150 custom-scrollbar" 
+                        placeholder="Cole os dados do Inventário incluindo cabeçalho...&#10;Exemplo:&#10;Unidade	Local	Item&#10;CRAS 01	Almoxarifado	Papel A4"
+                        aria-label="Dados do Inventário"
+                    ></textarea>
+                    <div class="absolute top-2 right-2">
+                        <button onclick="clearTextarea('list-inventario')" class="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1 rounded-lg text-xs font-semibold transition">
+                            Limpar
+                        </button>
+                    </div>
+                </div>
             </div>
             
-            <!-- Sistema (Destino) -->
-            <div>
-                <label for="list-sistema" class="block text-lg font-semibold text-sistema mb-2 flex items-center">
-                    <span class="mr-2">⚙️</span>
-                    2. Dados do Sistema (Estoque Atual)
+            <!-- Sistema -->
+            <div class="group">
+                <label for="list-sistema" class="block text-lg font-bold text-sistema mb-3 flex items-center gap-2">
+                    <span class="text-2xl">⚙️</span>
+                    <span>Dados do Sistema</span>
+                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Localização, Descrição">ℹ️</span>
                 </label>
-                <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Localização, Descrição
-                </p>
-                <textarea id="list-sistema" class="w-full p-3 border border-sistema rounded-lg focus:ring-sistema focus:border-sistema transition duration-150" placeholder="Cole aqui os dados do Sistema, incluindo o cabeçalho..."></textarea>
-                <span id="count-sistema" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Sistema: 0</span>
+                <div class="relative">
+                    <textarea 
+                        id="list-sistema" 
+                        class="w-full p-4 border-2 border-sistema rounded-xl focus:ring-2 focus:ring-sistema focus:border-sistema transition duration-150 custom-scrollbar" 
+                        placeholder="Cole os dados do Sistema incluindo cabeçalho...&#10;Exemplo:&#10;Unidade	Localização	Descrição&#10;CRAS 01	Almoxarifado	Papel A4"
+                        aria-label="Dados do Sistema"
+                    ></textarea>
+                    <div class="absolute top-2 right-2">
+                        <button onclick="clearTextarea('list-sistema')" class="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1 rounded-lg text-xs font-semibold transition">
+                            Limpar
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- BOTÃO DE AÇÃO ÚNICO -->
+        <!-- Botão de Ação -->
         <div class="mb-8">
-             <button onclick="runMasterCount()" class="w-full px-6 py-3 bg-primary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
-                Analisar Contagem de Itens por Local
-            </button>
+             <button 
+                onclick="runMasterCount()" 
+                class="w-full px-8 py-4 bg-gradient-to-r from-primary to-primary-dark text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-3"
+                aria-label="Iniciar análise de dados"
+             >
+                <span class="text-2xl">🚀</span>
+                <span>Analisar Contagem de Itens por Local</span>
+             </button>
         </div>
         
-        
-        <!-- Container de Resultados - Auditoria de Quantidade -->
-        <div id="results-container" class="mt-12 hidden">
-            <h2 id="report-title" class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-primary pb-2">
-                Relatório de Auditoria de Quantidade
-            </h2>
-
-            <!-- FILTRO DE UNIDADE (Agora DENTRO do resultado) -->
-            <div id="filter-container" class="mb-6 hidden">
-                <label for="unit-filter" class="block text-lg font-semibold text-gray-700 mb-2">
-                    Filtrar por Unidade (CRAS):
-                </label>
-                <select id="unit-filter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150 bg-white" onchange="filterResultCards(this.value)">
-                    <option value="all">-- Todas as Unidades --</option>
-                    <!-- Opções de unidade serão preenchidas dinamicamente -->
-                </select>
-            </div>
-            
-            <!-- Export Button -->
-            <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4">
-                Exportar Auditoria CSV
-            </button>
-            
-            <!-- Resumo de Totais (Será atualizado pelo filtro) -->
-            <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg shadow">
-                    <div class="text-3xl font-bold text-blue-600" id="summary-inv">0</div>
-                    <div class="text-sm font-semibold text-gray-600">Total Itens (Inventário)</div>
-                </div>
-                 <div class="p-4 bg-orange-50 border border-orange-200 rounded-lg shadow">
-                    <div class="text-3xl font-bold text-orange-600" id="summary-sis">0</div>
-                    <div class="text-sm font-semibold text-gray-600">Total Itens (Sistema)</div>
-                </div>
-                 <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg shadow">
-                    <div class="text-3xl font-bold text-gray-700" id="summary-diff">0</div>
-                    <div class="text-sm font-semibold text-gray-600">Diferença Líquida (Inv - Sis)</div>
-                </div>
+        <!-- Container de Resultados -->
+        <div id="results-container" class="mt-12 hidden fade-in">
+            <div class="mb-6 p-6 bg-gradient-to-r from-primary to-primary-dark rounded-xl text-white">
+                <h2 id="report-title" class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="text-4xl">📈</span>
+                    <span>Relatório de Auditoria de Quantidade</span>
+                </h2>
+                <p class="text-green-100">Análise completa de discrepâncias entre Inventário e Sistema</p>
             </div>
 
-            <!-- Container de Cards de Discrepância -->
-            <h3 class="text-xl font-bold text-gray-800 mb-4">
-                Discrepâncias Encontradas (Clique no card para ver os itens)
-            </h3>
-            <p id="no-discrepancy-message" class="text-gray-600 text-center p-6 bg-gray-50 rounded-lg hidden">
-                🎉 Nenhuma discrepância encontrada para esta seleção!
+            <!-- Filtros e Busca -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <!-- Filtro de Unidade -->
+                <div id="filter-container" class="hidden">
+                    <label for="unit-filter" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                        🏢 Filtrar por Unidade (CRAS)
+                    </label>
+                    <select 
+                        id="unit-filter" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition duration-150 bg-white font-semibold" 
+                        onchange="filterResultCards(this.value)"
+                        aria-label="Selecione a unidade para filtrar"
+                    >
+                        <option value="all">🌐 Todas as Unidades</option>
+                    </select>
+                </div>
+
+                <!-- Busca de Local -->
+                <div id="search-container" class="hidden">
+                    <label for="local-search" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                        🔍 Buscar Local
+                    </label>
+                    <div class="search-box relative">
+                        <input 
+                            type="text" 
+                            id="local-search" 
+                            class="w-full p-3 pl-10 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition duration-150" 
+                            placeholder="Digite o nome do local..."
+                            oninput="searchLocal(this.value)"
+                            aria-label="Buscar por nome de local"
+                        />
+                        <span class="absolute left-3 top-3.5 text-gray-400 text-xl">🔎</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export Button melhorado -->
+            <div class="flex flex-wrap gap-3 mb-6">
+                <button 
+                    onclick="exportCSV()" 
+                    class="px-6 py-3 bg-gradient-to-r from-export to-fuchsia-600 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
+                >
+                    <span class="text-xl">📥</span>
+                    <span>Exportar Auditoria CSV</span>
+                </button>
+                <button 
+                    onclick="printReport()" 
+                    class="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
+                >
+                    <span class="text-xl">🖨️</span>
+                    <span>Imprimir Relatório</span>
+                </button>
+            </div>
+            
+            <!-- Resumo Melhorado -->
+            <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-lg card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-4xl">📋</span>
+                        <span class="status-badge bg-blue-200 text-blue-700">Fonte</span>
+                    </div>
+                    <div class="text-4xl font-black text-blue-600 mb-2" id="summary-inv">0</div>
+                    <div class="text-sm font-bold text-gray-600 uppercase tracking-wide">Total Itens (Inventário)</div>
+                    <div class="progress-bar mt-3">
+                        <div class="progress-fill bg-blue-500" id="progress-inv" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl shadow-lg card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-4xl">⚙️</span>
+                        <span class="status-badge bg-orange-200 text-orange-700">Atual</span>
+                    </div>
+                    <div class="text-4xl font-black text-orange-600 mb-2" id="summary-sis">0</div>
+                    <div class="text-sm font-bold text-gray-600 uppercase tracking-wide">Total Itens (Sistema)</div>
+                    <div class="progress-bar mt-3">
+                        <div class="progress-fill bg-orange-500" id="progress-sis" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-300 rounded-xl shadow-lg card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-4xl" id="diff-icon">📊</span>
+                        <span class="status-badge bg-gray-200 text-gray-700" id="diff-status">Análise</span>
+                    </div>
+                    <div class="text-4xl font-black text-gray-700 mb-2" id="summary-diff">0</div>
+                    <div class="text-sm font-bold text-gray-600 uppercase tracking-wide">Diferença Líquida (Inv - Sis)</div>
+                    <div class="progress-bar mt-3">
+                        <div class="progress-fill bg-gray-500" id="progress-diff" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estatísticas Adicionais -->
+            <div id="additional-stats" class="hidden mb-8 p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="text-2xl">📊</span>
+                    <span>Estatísticas Detalhadas</span>
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div class="p-4 bg-white rounded-lg shadow">
+                        <div class="text-2xl font-bold text-green-600" id="stat-matches">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Locais Corretos</div>
+                    </div>
+                    <div class="p-4 bg-white rounded-lg shadow">
+                        <div class="text-2xl font-bold text-red-600" id="stat-discrepancies">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Discrepâncias</div>
+                    </div>
+                    <div class="p-4 bg-white rounded-lg shadow">
+                        <div class="text-2xl font-bold text-blue-600" id="stat-inv-only">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Só no Inventário</div>
+                    </div>
+                    <div class="p-4 bg-white rounded-lg shadow">
+                        <div class="text-2xl font-bold text-orange-600" id="stat-sys-only">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Só no Sistema</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards de Discrepância -->
+            <div class="mb-4">
+                <h3 class="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    <span class="text-3xl">⚠️</span>
+                    <span>Discrepâncias Encontradas</span>
+                    <span id="discrepancy-count" class="ml-auto bg-red-100 text-red-700 px-4 py-1 rounded-full font-bold text-sm">0</span>
+                </h3>
+                <p class="text-gray-600 mb-4">Clique nos cards para visualizar detalhes completos dos itens</p>
+            </div>
+            
+            <p id="no-discrepancy-message" class="text-center p-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 hidden">
+                <span class="text-6xl mb-4 block">🎉</span>
+                <span class="text-2xl font-bold text-green-700 block mb-2">Perfeito!</span>
+                <span class="text-gray-600">Nenhuma discrepância encontrada para esta seleção</span>
             </p>
-            <div id="discrepancy-cards-container" class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Cards de discrepância clicáveis serão injetados aqui -->
+            
+            <div id="discrepancy-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Cards serão injetados aqui -->
             </div>
         </div>
     </div>
 
-    <!-- MODAL (Janela) para Detalhes dos Itens -->
-    <div id="item-details-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeModal()">
-        <div class="modal-content bg-white w-full max-w-4xl rounded-xl shadow-2xl p-6 md:p-8 transform scale-95" onclick="event.stopPropagation()">
-            <!-- Cabeçalho do Modal -->
-            <div class="flex justify-between items-center border-b pb-3 mb-4">
+    <!-- MODAL Melhorado -->
+    <div id="item-details-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeModal()">
+        <div class="modal-content bg-white w-full max-w-5xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
+            <!-- Header do Modal -->
+            <div class="flex justify-between items-center border-b-2 border-gray-200 p-6 bg-gradient-to-r from-primary to-primary-dark text-white rounded-t-2xl">
                 <div>
-                    <h2 id="modal-title" class="text-2xl font-bold text-gray-800">Detalhes dos Itens</h2>
-                    <p id="modal-subtitle" class="text-gray-600"></p>
+                    <h2 id="modal-title" class="text-3xl font-bold">Detalhes dos Itens</h2>
+                    <p id="modal-subtitle" class="text-green-100 mt-1"></p>
                 </div>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-3xl">&times;</button>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200 text-4xl transition-colors" aria-label="Fechar modal">
+                    &times;
+                </button>
             </div>
             
-            <!-- Conteúdo do Modal (Listas Lado a Lado) -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto pr-2">
+            <!-- Busca no Modal -->
+            <div class="px-6 pt-4">
+                <div class="search-box relative">
+                    <input 
+                        type="text" 
+                        id="modal-search" 
+                        class="w-full p-3 pl-10 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition" 
+                        placeholder="🔎 Buscar item na lista..."
+                        oninput="searchModalItems(this.value)"
+                    />
+                    <span class="absolute left-3 top-3.5 text-gray-400 text-xl">🔍</span>
+                </div>
+            </div>
+            
+            <!-- Conteúdo do Modal -->
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                 <!-- Lista Inventário -->
-                <div>
-                    <h3 id="modal-inv-title" class="text-lg font-semibold text-inventario mb-2">Itens no Inventário (0)</h3>
-                    <ul id="modal-inv-list" class="list-disc list-inside bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-gray-700 space-y-1">
-                        <!-- Itens do Inventário aqui -->
+                <div class="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
+                    <h3 id="modal-inv-title" class="text-xl font-bold text-inventario mb-3 flex items-center gap-2">
+                        <span class="text-2xl">📋</span>
+                        <span>Itens no Inventário (0)</span>
+                    </h3>
+                    <ul id="modal-inv-list" class="space-y-2 text-sm text-gray-700">
+                        <!-- Itens do Inventário -->
                     </ul>
                 </div>
+                
                 <!-- Lista Sistema -->
-                <div>
-                    <h3 id="modal-sis-title" class="text-lg font-semibold text-sistema mb-2">Itens no Sistema (0)</h3>
-                    <ul id="modal-sis-list" class="list-disc list-inside bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-gray-700 space-y-1">
-                        <!-- Itens do Sistema aqui -->
+                <div class="bg-orange-50 rounded-xl p-5 border-2 border-orange-200">
+                    <h3 id="modal-sis-title" class="text-xl font-bold text-sistema mb-3 flex items-center gap-2">
+                        <span class="text-2xl">⚙️</span>
+                        <span>Itens no Sistema (0)</span>
+                    </h3>
+                    <ul id="modal-sis-list" class="space-y-2 text-sm text-gray-700">
+                        <!-- Itens do Sistema -->
                     </ul>
                 </div>
             </div>
             
-            <!-- Rodapé do Modal -->
-            <div class="mt-6 text-right border-t pt-4">
-                <button onclick="closeModal()" class="px-6 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-200">
+            <!-- Footer do Modal -->
+            <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    <span class="font-semibold">Dica:</span> Use Ctrl+F para buscar rapidamente
+                </div>
+                <button 
+                    onclick="closeModal()" 
+                    class="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-bold rounded-xl hover:from-gray-700 hover:to-gray-800 transition duration-200 shadow-lg"
+                >
                     Fechar
                 </button>
             </div>
         </div>
     </div>
 
-
     <script>
-        // Global variable for storing audit data
-        let auditData = []; // Para a auditoria de quantidade
+        // === VARIÁVEIS GLOBAIS ===
+        let auditData = [];
         let globalInventarioData = [];
         let globalSistemaData = [];
         let uniqueUnits = new Set();
-        // Armazena os dados completos da auditoria, incluindo listas de itens
         let discrepancyDetails = new Map();
-
+        let currentSearchTerm = '';
         
-        // Função de normalização BÁSICA (apenas remove acentos, minúsculas, espaços extras)
+        // === FUNÇÕES DE UTILIDADE ===
+        
+        // Normalização melhorada de strings
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
-            let s = str.toLowerCase();
-            // 1. Remove acentos
-            s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            // 2. Remove caracteres especiais
-            s = s.replace(/[-/.,]/g, ' '); 
-            // 3. Remove espaços extras
-            s = s.replace(/\s+/g, ' ').trim(); 
-            return s;
+            return str
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[-/.,;:()]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
-        // Função para detetar o separador (vírgula, ponto e vírgula, ou tab) e parsear os dados
+        // Parser inteligente de dados com detecção automática de separador
         function parseData(text) {
             const lines = text.trim().split('\n').filter(line => line.trim() !== '');
             if (lines.length === 0) return [];
 
             const firstLine = lines[0];
-            let separator = '\t'; // Tentativa padrão: Tab
-
-            // Conta a frequência de cada separador na primeira linha
-            const counts = { ',': (firstLine.match(/,/g) || []).length, ';': (firstLine.match(/;/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length };
             
-            // Escolhe o separador com maior contagem (se for maior que zero)
-            if (counts[';'] > counts[','] && counts[';'] > counts['\t']) {
-                separator = ';';
-            } else if (counts[','] > counts[';'] && counts[','] > counts['\t']) {
-                separator = ',';
-            } else if (counts['\t'] > 0) {
-                 separator = '\t';
+            // Detecta o separador mais provável
+            const separators = {
+                '\t': (firstLine.match(/\t/g) || []).length,
+                ';': (firstLine.match(/;/g) || []).length,
+                ',': (firstLine.match(/,/g) || []).length,
+                '|': (firstLine.match(/\|/g) || []).length
+            };
+            
+            const separator = Object.keys(separators).reduce((a, b) => 
+                separators[a] > separators[b] ? a : b
+            );
+
+            if (separators[separator] === 0) {
+                console.warn('Nenhum separador detectado');
+                return [];
             }
 
             const rawHeaders = lines[0].split(separator).map(h => h.trim());
@@ -233,30 +595,239 @@
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(separator).map(v => v.trim());
-                if (values.length === rawHeaders.length) {
+                if (values.length === rawHeaders.length && values.some(v => v !== '')) {
                     const item = {};
                     rawHeaders.forEach((header, index) => {
-                        // Encontra o cabeçalho original (mantendo case)
-                        const originalHeader = rawHeaders.find(h => normalizeString(h) === normalizeString(header));
-                        item[originalHeader || header] = values[index];
+                        item[header] = values[index];
                     });
                     data.push(item);
                 }
             }
+            
+            console.log(`Parser: ${data.length} linhas processadas com separador '${separator === '\t' ? 'TAB' : separator}'`);
             return data;
         }
 
-        // Função para PREENCHER o filtro de unidades (não mais atualizar)
+        // Limpar textarea
+        function clearTextarea(id) {
+            document.getElementById(id).value = '';
+            updateDataCount();
+        }
+
+        // Mostrar/ocultar loading
+        function showLoading(show = true) {
+            const overlay = document.getElementById('loading-overlay');
+            if (show) {
+                overlay.classList.remove('hidden');
+            } else {
+                setTimeout(() => overlay.classList.add('hidden'), 500);
+            }
+        }
+
+        // === FUNÇÕES DE ATUALIZAÇÃO DE UI ===
+        
+        // Atualizar contadores
+        function updateDataCount() {
+            const invTextarea = document.getElementById('list-inventario');
+            const sisTextarea = document.getElementById('list-sistema');
+            
+            const invLines = invTextarea.value.trim().split('\n').filter(Boolean).length;
+            const sisLines = sisTextarea.value.trim().split('\n').filter(Boolean).length;
+            
+            const invCount = Math.max(0, invLines - 1);
+            const sisCount = Math.max(0, sisLines - 1);
+            
+            document.getElementById('count-inventario').textContent = invCount;
+            document.getElementById('count-sistema').textContent = sisCount;
+        }
+
+        // Debounce para performance
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // === FUNÇÃO PRINCIPAL DE ANÁLISE ===
+        
+        async function runMasterCount() {
+            showLoading(true);
+            
+            // Esconde resultados anteriores
+            document.getElementById('results-container').classList.add('hidden');
+            
+            // Aguarda um frame para o loading aparecer
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            try {
+                // Carrega dados
+                globalInventarioData = parseData(document.getElementById('list-inventario').value);
+                globalSistemaData = parseData(document.getElementById('list-sistema').value);
+                
+                if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
+                    alert("⚠️ Por favor, cole os dados nas duas caixas antes de analisar.");
+                    showLoading(false);
+                    return;
+                }
+
+                if (globalInventarioData.length === 0) {
+                    alert("⚠️ Aviso: Não há dados no Inventário!");
+                }
+                
+                if (globalSistemaData.length === 0) {
+                    alert("⚠️ Aviso: Não há dados no Sistema!");
+                }
+
+                // Processa dados
+                await processAuditData();
+                
+                // Mostra resultados
+                document.getElementById('results-container').classList.remove('hidden');
+                document.getElementById('filter-container').classList.remove('hidden');
+                document.getElementById('search-container').classList.remove('hidden');
+                document.getElementById('additional-stats').classList.remove('hidden');
+                
+                // Popula filtro
+                populateUnitFilter();
+                
+                // Reseta filtros
+                document.getElementById('unit-filter').value = 'all';
+                document.getElementById('local-search').value = '';
+                
+                // Renderiza pela primeira vez
+                filterResultCards('all');
+                
+                showLoading(false);
+                
+                // Scroll suave para resultados
+                setTimeout(() => {
+                    document.getElementById('results-container').scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                }, 300);
+                
+            } catch (error) {
+                console.error('Erro ao processar dados:', error);
+                alert('❌ Erro ao processar dados. Verifique o formato e tente novamente.');
+                showLoading(false);
+            }
+        }
+
+        // Processar dados de auditoria
+        async function processAuditData() {
+            const inventarioMap = new Map();
+            const sistemaMap = new Map();
+            const allCompositeKeys = new Set();
+            auditData = [];
+            discrepancyDetails.clear();
+            
+            // Encontra colunas
+            const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
+            const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
+            const invLocalCol = invHeader.find(k => normalizeString(k) === 'local');
+            const invItemCol = invHeader.find(k => normalizeString(k) === 'item');
+            
+            const sisHeader = globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : [];
+            const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
+            const sisLocalCol = sisHeader.find(k => normalizeString(k) === 'localizacao') || 
+                               sisHeader.find(k => normalizeString(k) === 'local');
+            const sisItemCol = sisHeader.find(k => normalizeString(k) === 'descricao') || 
+                              sisHeader.find(k => normalizeString(k) === 'item');
+
+            if (!invLocalCol || !sisLocalCol) {
+                throw new Error("Colunas 'Local' ou 'Localização' não encontradas");
+            }
+
+            // Processa Inventário
+            globalInventarioData.forEach(item => {
+                const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
+                const local = normalizeString(item[invLocalCol] || 'sem local');
+                const itemName = invItemCol ? (item[invItemCol] || 'Item sem nome') : 'Item sem nome';
+                const compositeKey = `${unidade}|${local}`;
+                
+                allCompositeKeys.add(compositeKey);
+                
+                if (!inventarioMap.has(compositeKey)) {
+                    inventarioMap.set(compositeKey, { count: 0, items: [], originalUnit: item[invUnitCol] || 'Sem Unidade', originalLocal: item[invLocalCol] || 'Sem Local' });
+                }
+                const data = inventarioMap.get(compositeKey);
+                data.count++;
+                data.items.push(itemName);
+            });
+            
+            // Processa Sistema
+            globalSistemaData.forEach(item => {
+                const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
+                const local = normalizeString(item[sisLocalCol] || 'sem local');
+                const itemName = sisItemCol ? (item[sisItemCol] || 'Item sem nome') : 'Item sem nome';
+                const compositeKey = `${unidade}|${local}`;
+
+                allCompositeKeys.add(compositeKey);
+
+                if (!sistemaMap.has(compositeKey)) {
+                    sistemaMap.set(compositeKey, { count: 0, items: [], originalUnit: item[sisUnitCol] || 'Sem Unidade', originalLocal: item[sisLocalCol] || 'Sem Local' });
+                }
+                const data = sistemaMap.get(compositeKey);
+                data.count++;
+                data.items.push(itemName);
+            });
+
+            // Gera relatório
+            const sortedKeys = [...allCompositeKeys].sort();
+
+            for (const compositeKey of sortedKeys) {
+                if (compositeKey === "sem unidade|sem local") continue;
+                
+                const [unidade, local] = compositeKey.split('|');
+                
+                const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
+                const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
+                
+                const qtdInv = invData.count;
+                const qtdSis = sisData.count;
+                const diff = qtdInv - qtdSis;
+
+                if (qtdInv > 0 || qtdSis > 0) {
+                    const auditRow = {
+                        key: compositeKey,
+                        unidade: unidade,
+                        local: local,
+                        originalUnit: invData.originalUnit || sisData.originalUnit,
+                        originalLocal: invData.originalLocal || sisData.originalLocal,
+                        qtdInv: qtdInv,
+                        qtdSis: qtdSis,
+                        diff: diff
+                    };
+                    auditData.push(auditRow);
+
+                    if (diff !== 0) {
+                        discrepancyDetails.set(compositeKey, {
+                            unidade: auditRow.originalUnit,
+                            local: auditRow.originalLocal,
+                            invItems: invData.items.sort(),
+                            sisItems: sisData.items.sort()
+                        });
+                    }
+                }
+            }
+        }
+
+        // Popular filtro de unidades
         function populateUnitFilter() {
             uniqueUnits = new Set();
             const filterSelect = document.getElementById('unit-filter');
-            const filterContainer = document.getElementById('filter-container');
 
-            // Encontra o nome da coluna "Unidade" em ambas as listas
-            const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
+            const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
             const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
             
-            const sisHeader = (globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : []);
+            const sisHeader = globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : [];
             const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
             
             globalInventarioData.forEach(item => {
@@ -266,11 +837,9 @@
                 if(sisUnitCol) uniqueUnits.add(normalizeString(item[sisUnitCol] || ''));
             });
 
-            // Limpa unidades vazias
             uniqueUnits.delete('');
             uniqueUnits.delete('sem unidade');
 
-            // Limpa opções antigas (mantendo a primeira)
             while (filterSelect.options.length > 1) {
                 filterSelect.remove(1);
             }
@@ -279,146 +848,14 @@
             sortedUnits.forEach(unit => {
                 const option = document.createElement('option');
                 option.value = unit;
-                option.textContent = unit.toUpperCase(); // Mostra em maiúsculo para ficar mais claro
+                option.textContent = `🏢 ${unit.toUpperCase()}`;
                 filterSelect.appendChild(option);
             });
-            
-            if (sortedUnits.length > 0) {
-                filterContainer.classList.remove('hidden');
-            } else {
-                filterContainer.classList.add('hidden');
-            }
         }
+
+        // === FILTROS E BUSCA ===
         
-        // --- FLUXO ÚNICO: Auditoria de Quantidade Mestra ---
-        function runMasterCount() {
-            document.getElementById('results-container').classList.add('hidden');
-            
-            // Sempre (re)carrega os dados dos textareas
-            globalInventarioData = parseData(document.getElementById('list-inventario').value);
-            globalSistemaData = parseData(document.getElementById('list-sistema').value);
-            
-            if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
-                alert("Por favor, cole os dados nas duas caixas antes de analisar.");
-                return;
-            }
-
-            // Mostra o container de resultados
-            document.getElementById('results-container').classList.remove('hidden');
-
-            // PREENCHE o filtro de unidades (nova lógica)
-            populateUnitFilter(); 
-            // Reseta o filtro para "Todas as Unidades"
-            document.getElementById('unit-filter').value = 'all';
-
-            const inventarioMap = new Map(); // Map<"unidade|local", { count: 0, items: [] }>
-            const sistemaMap = new Map();
-            const allCompositeKeys = new Set();
-            auditData = []; // Limpa auditoria anterior
-            discrepancyDetails.clear(); // Limpa detalhes anteriores
-            
-            // Encontra os nomes das colunas
-            const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
-            const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
-            const invLocalCol = invHeader.find(k => normalizeString(k) === 'local');
-            const invItemCol = invHeader.find(k => normalizeString(k) === 'item'); // Novo: Coluna do Item
-            
-            const sisHeader = (globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : []);
-            const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
-            const sisLocalCol = sisHeader.find(k => normalizeString(k) === 'localizacao') || sisHeader.find(k => normalizeString(k) === 'local');
-            const sisItemCol = sisHeader.find(k => normalizeString(k) === 'descricao') || sisHeader.find(k => normalizeString(k) === 'item'); // Novo: Coluna da Descrição
-
-            if (!invLocalCol || !sisLocalCol) {
-                alert("Erro: Não foi possível encontrar as colunas 'Local' (na Lista 1) e 'Localização' (na Lista 2). Verifique os cabeçalhos.");
-                return;
-            }
-             if (!invItemCol || !sisItemCol) {
-                alert("Aviso: Não foi possível encontrar as colunas 'Item' (Lista 1) ou 'Descrição' (Lista 2). O detalhamento de itens pode ficar vazio.");
-            }
-
-            // Processa Inventário (USA: Unidade, Local, Item)
-            globalInventarioData.forEach(item => {
-                const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'Sem Unidade') : 'sem unidade';
-                const local = normalizeString(item[invLocalCol] || 'Sem Local');
-                const itemName = invItemCol ? (item[invItemCol] || 'Item sem nome') : 'Item sem nome';
-                const compositeKey = `${unidade}|${local}`;
-                
-                allCompositeKeys.add(compositeKey);
-                
-                if (!inventarioMap.has(compositeKey)) {
-                    inventarioMap.set(compositeKey, { count: 0, items: [] });
-                }
-                const data = inventarioMap.get(compositeKey);
-                data.count++;
-                data.items.push(itemName);
-            });
-            
-            // Processa Sistema (USA: Unidade, Localização, Descrição)
-            globalSistemaData.forEach(item => {
-                const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'Sem Unidade') : 'sem unidade';
-                const local = normalizeString(item[sisLocalCol] || 'Sem Local');
-                const itemName = sisItemCol ? (item[sisItemCol] || 'Item sem nome') : 'Item sem nome';
-                const compositeKey = `${unidade}|${local}`;
-
-                allCompositeKeys.add(compositeKey);
-
-                if (!sistemaMap.has(compositeKey)) {
-                    sistemaMap.set(compositeKey, { count: 0, items: [] });
-                }
-                const data = sistemaMap.get(compositeKey);
-                data.count++;
-                data.items.push(itemName);
-            });
-
-            // Gera o relatório de auditoria (APENAS os dados)
-            // A renderização dos cards agora é feita por filterResultCards()
-            
-            const sortedKeys = [...allCompositeKeys].sort();
-
-            for (const compositeKey of sortedKeys) {
-                // Ignora chaves "vazias"
-                if (compositeKey === "sem unidade|sem local") continue;
-                
-                const [unidade, local] = compositeKey.split('|');
-                
-                const invData = inventarioMap.get(compositeKey) || { count: 0, items: [] };
-                const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [] };
-                
-                const qtdInv = invData.count;
-                const qtdSis = sisData.count;
-                const diff = qtdInv - qtdSis;
-
-                // Processa se existir em qualquer lista
-                if (qtdInv > 0 || qtdSis > 0) { 
-                    
-                    // 1. Salva para exportação E filtragem
-                    const auditRow = {
-                        key: compositeKey, // Chave para o modal
-                        unidade: unidade,
-                        local: local,
-                        qtdInv: qtdInv,
-                        qtdSis: qtdSis,
-                        diff: diff
-                    };
-                    auditData.push(auditRow); // Salva para exportação e filtragem
-
-                    // 2. Armazena os detalhes para o modal (SE houver diferença)
-                    if (diff !== 0) {
-                        discrepancyDetails.set(compositeKey, {
-                            unidade: unidade,
-                            local: local,
-                            invItems: invData.items.sort(),
-                            sisItems: sisData.items.sort()
-                        });
-                    }
-                }
-            }
-            
-            // CHAMA O FILTRO pela primeira vez (mostrando 'all')
-            filterResultCards('all');
-        }
-
-        // NOVO: Função para FILTRAR e RENDERIZAR os cards e o resumo
+        // Filtrar cards
         function filterResultCards(selectedUnit) {
             const cardsContainer = document.getElementById('discrepancy-cards-container');
             const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
@@ -426,204 +863,387 @@
             
             let totalInv = 0;
             let totalSis = 0;
-            let hasDiscrepancy = false;
+            let discrepancyCount = 0;
+            let matchCount = 0;
+            let invOnlyCount = 0;
+            let sysOnlyCount = 0;
 
-            // Filtra os dados da auditoria
             const filteredData = (selectedUnit === 'all') 
                 ? auditData 
                 : auditData.filter(item => item.unidade === selectedUnit);
 
-            for (const item of filteredData) {
-                // 1. Atualiza totais do resumo
+            // Aplica filtro de busca de local
+            const searchFiltered = currentSearchTerm 
+                ? filteredData.filter(item => 
+                    normalizeString(item.local).includes(normalizeString(currentSearchTerm)) ||
+                    normalizeString(item.originalLocal).includes(normalizeString(currentSearchTerm))
+                  )
+                : filteredData;
+
+            // Processa dados
+            for (const item of searchFiltered) {
                 totalInv += item.qtdInv;
                 totalSis += item.qtdSis;
 
-                // 2. Cria o card APENAS SE houver discrepância
+                if (item.diff === 0) {
+                    matchCount++;
+                } else {
+                    discrepancyCount++;
+                    if (item.qtdSis === 0) invOnlyCount++;
+                    if (item.qtdInv === 0) sysOnlyCount++;
+                }
+
+                // Cria card apenas para discrepâncias
                 if (item.diff !== 0) {
-                    hasDiscrepancy = true;
-                    
-                    let cardClass = 'bg-white border-gray-300';
-                    let diffClass = 'text-gray-700';
-                    let diffText = `${item.diff > 0 ? '+' : ''}${item.diff}`;
-                    
-                    if (item.diff > 0) { // Falta no Sistema
-                        cardClass = 'bg-green-50 border-green-300';
-                        diffClass = 'text-green-600';
-                    } else { // Sobra no Sistema
-                        cardClass = 'bg-red-50 border-red-300';
-                        diffClass = 'text-red-600';
-                    }
-                    
-                    // O card agora é um <button>
-                    const card = document.createElement('button');
-                    // Adiciona data-unidade para o filtro (embora o JS já filtre, isso é bom para CSS se necessário)
-                    card.setAttribute('data-unidade', item.unidade); 
-                    card.className = `p-4 border rounded-lg shadow-md text-left transition-transform transform hover:scale-105 ${cardClass}`;
-                    card.setAttribute('onclick', `openModal('${item.key}')`);
-                    card.innerHTML = `
-                        <h3 class="text-lg font-bold text-gray-800">${item.local}</h3>
-                        <p class="text-sm text-gray-600 mb-3">${item.unidade}</p>
-                        <div class="flex justify-between items-center text-center px-2">
-                            <div>
-                                <span class="block text-2xl font-bold text-blue-600">${item.qtdInv}</span>
-                                <span class="text-xs font-semibold text-gray-500">Inventário</span>
-                            </div>
-                            <div>
-                                <span class="block text-2xl font-bold text-orange-600">${item.qtdSis}</span>
-                                <span class="text-xs font-semibold text-gray-500">Sistema</span>
-                            </div>
-                            <div>
-                                <span class="block text-2xl font-bold ${diffClass}">${diffText}</span>
-                                <span class="text-xs font-semibold text-gray-500">Diferença</span>
-                            </div>
-                        </div>
-                    `;
+                    const card = createDiscrepancyCard(item);
                     cardsContainer.appendChild(card);
                 }
             }
+
+            // Atualiza UI
+            updateSummaryUI(totalInv, totalSis, totalInv - totalSis);
+            updateStatsUI(matchCount, discrepancyCount, invOnlyCount, sysOnlyCount);
             
-            // Mostra mensagem se não houver discrepâncias
-            if (!hasDiscrepancy) {
+            document.getElementById('discrepancy-count').textContent = discrepancyCount;
+            
+            if (discrepancyCount === 0) {
                 noDiscrepancyMsg.classList.remove('hidden');
             } else {
                 noDiscrepancyMsg.classList.add('hidden');
             }
 
-            // Atualiza Títulos e Resumo
+            // Atualiza título
             const unitText = selectedUnit === 'all' ? 'Geral (Todas as Unidades)' : selectedUnit.toUpperCase();
-            document.getElementById('report-title').textContent = `Relatório de Auditoria: ${unitText}`;
-            
-            document.getElementById('summary-inv').textContent = totalInv;
-            document.getElementById('summary-sis').textContent = totalSis;
-            const totalDiff = totalInv - totalSis;
-            document.getElementById('summary-diff').textContent = `${totalDiff > 0 ? '+' : ''}${totalDiff}`;
+            const searchText = currentSearchTerm ? ` - Busca: "${currentSearchTerm}"` : '';
+            document.getElementById('report-title').innerHTML = `
+                <span class="text-4xl">📈</span>
+                <span>Relatório: ${unitText}${searchText}</span>
+            `;
         }
 
+        // Criar card de discrepância
+        function createDiscrepancyCard(item) {
+            let cardClass = 'bg-white border-gray-300';
+            let diffClass = 'text-gray-700';
+            let bgGradient = 'from-gray-50 to-gray-100';
+            let borderColor = 'border-gray-300';
+            let icon = '📊';
+            
+            if (item.diff > 0) {
+                cardClass = 'bg-gradient-to-br from-green-50 to-green-100 border-green-300';
+                diffClass = 'text-green-600';
+                bgGradient = 'from-green-50 to-green-100';
+                borderColor = 'border-green-400';
+                icon = '⬆️';
+            } else if (item.diff < 0) {
+                cardClass = 'bg-gradient-to-br from-red-50 to-red-100 border-red-300';
+                diffClass = 'text-red-600';
+                bgGradient = 'from-red-50 to-red-100';
+                borderColor = 'border-red-400';
+                icon = '⬇️';
+            }
+            
+            const diffText = `${item.diff > 0 ? '+' : ''}${item.diff}`;
+            
+            const card = document.createElement('button');
+            card.className = `p-6 border-2 rounded-xl shadow-lg text-left transition-all card-hover ${cardClass} ${borderColor}`;
+            card.setAttribute('onclick', `openModal('${item.key}')`);
+            card.setAttribute('aria-label', `Ver detalhes de ${item.originalLocal}`);
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-gray-800 mb-1">${item.originalLocal}</h3>
+                        <p class="text-sm text-gray-600 font-semibold">🏢 ${item.originalUnit}</p>
+                    </div>
+                    <div class="text-4xl">${icon}</div>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-white bg-opacity-60 p-3 rounded-lg shadow">
+                        <div class="text-2xl font-black text-blue-600">${item.qtdInv}</div>
+                        <div class="text-xs font-bold text-gray-600 mt-1">INVENTÁRIO</div>
+                    </div>
+                    <div class="bg-white bg-opacity-60 p-3 rounded-lg shadow">
+                        <div class="text-2xl font-black text-orange-600">${item.qtdSis}</div>
+                        <div class="text-xs font-bold text-gray-600 mt-1">SISTEMA</div>
+                    </div>
+                    <div class="bg-white bg-opacity-60 p-3 rounded-lg shadow">
+                        <div class="text-2xl font-black ${diffClass}">${diffText}</div>
+                        <div class="text-xs font-bold text-gray-600 mt-1">DIFERENÇA</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-center">
+                    <span class="inline-block px-4 py-2 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-700 shadow">
+                        👆 Clique para ver detalhes
+                    </span>
+                </div>
+            `;
+            return card;
+        }
 
-        // --- Funções do MODAL ---
+        // Atualizar resumo
+        function updateSummaryUI(totalInv, totalSis, totalDiff) {
+            document.getElementById('summary-inv').textContent = totalInv;
+            document.getElementById('summary-sis').textContent = totalSis;
+            document.getElementById('summary-diff').textContent = `${totalDiff > 0 ? '+' : ''}${totalDiff}`;
+            
+            // Atualiza ícone e status da diferença
+            const diffIcon = document.getElementById('diff-icon');
+            const diffStatus = document.getElementById('diff-status');
+            
+            if (totalDiff > 0) {
+                diffIcon.textContent = '📈';
+                diffStatus.textContent = 'Falta no Sistema';
+                diffStatus.className = 'status-badge bg-green-200 text-green-700';
+            } else if (totalDiff < 0) {
+                diffIcon.textContent = '📉';
+                diffStatus.textContent = 'Sobra no Sistema';
+                diffStatus.className = 'status-badge bg-red-200 text-red-700';
+            } else {
+                diffIcon.textContent = '✅';
+                diffStatus.textContent = 'Em Equilíbrio';
+                diffStatus.className = 'status-badge bg-green-200 text-green-700';
+            }
+            
+            // Atualiza barras de progresso
+            const maxValue = Math.max(totalInv, totalSis, 1);
+            document.getElementById('progress-inv').style.width = `${(totalInv / maxValue) * 100}%`;
+            document.getElementById('progress-sis').style.width = `${(totalSis / maxValue) * 100}%`;
+            
+            const diffPercent = Math.abs(totalDiff) / maxValue * 100;
+            const diffBar = document.getElementById('progress-diff');
+            diffBar.style.width = `${diffPercent}%`;
+            diffBar.className = `progress-fill ${totalDiff > 0 ? 'bg-green-500' : totalDiff < 0 ? 'bg-red-500' : 'bg-gray-500'}`;
+        }
+
+        // Atualizar estatísticas
+        function updateStatsUI(matches, discrepancies, invOnly, sysOnly) {
+            document.getElementById('stat-matches').textContent = matches;
+            document.getElementById('stat-discrepancies').textContent = discrepancies;
+            document.getElementById('stat-inv-only').textContent = invOnly;
+            document.getElementById('stat-sys-only').textContent = sysOnly;
+        }
+
+        // Busca de local (debounced)
+        const searchLocal = debounce((searchTerm) => {
+            currentSearchTerm = searchTerm;
+            const selectedUnit = document.getElementById('unit-filter').value;
+            filterResultCards(selectedUnit);
+        }, 300);
+
+        // === MODAL ===
+        
+        let currentModalData = { invItems: [], sisItems: [] };
+        
         function openModal(compositeKey) {
             const details = discrepancyDetails.get(compositeKey);
             if (!details) return;
 
+            currentModalData = details;
+
             const modal = document.getElementById('item-details-modal');
             const modalContent = modal.querySelector('.modal-content');
 
-            // Preenche Títulos
-            document.getElementById('modal-title').textContent = `Detalhes de: ${details.local.toUpperCase()}`;
-            document.getElementById('modal-subtitle').textContent = `Unidade: ${details.unidade.toUpperCase()}`;
+            document.getElementById('modal-title').textContent = `📍 ${details.local}`;
+            document.getElementById('modal-subtitle').textContent = `🏢 Unidade: ${details.unidade}`;
 
-            // Preenche Lista Inventário
-            const invList = document.getElementById('modal-inv-list');
-            invList.innerHTML = '';
-            document.getElementById('modal-inv-title').textContent = `Itens no Inventário (${details.invItems.length})`;
-            if (details.invItems.length === 0) {
-                invList.innerHTML = '<li class="text-gray-500 italic">Nenhum item encontrado.</li>';
-            } else {
-                details.invItems.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = item;
-                    invList.appendChild(li);
-                });
-            }
+            // Limpa busca
+            document.getElementById('modal-search').value = '';
+            
+            renderModalLists(details.invItems, details.sisItems);
 
-            // Preenche Lista Sistema
-            const sisList = document.getElementById('modal-sis-list');
-            sisList.innerHTML = '';
-            document.getElementById('modal-sis-title').textContent = `Itens no Sistema (${details.sisItems.length})`;
-             if (details.sisItems.length === 0) {
-                sisList.innerHTML = '<li class="text-gray-500 italic">Nenhum item encontrado.</li>';
-            } else {
-                details.sisItems.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = item;
-                    sisList.appendChild(li);
-                });
-            }
-
-            // Exibe o Modal com animação
+            // Exibe modal com animação
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
             }, 10);
         }
+
+        function renderModalLists(invItems, sisItems, searchTerm = '') {
+            const invList = document.getElementById('modal-inv-list');
+            const sisList = document.getElementById('modal-sis-list');
+            
+            // Filtra itens se houver busca
+            const filteredInvItems = searchTerm 
+                ? invItems.filter(item => normalizeString(item).includes(normalizeString(searchTerm)))
+                : invItems;
+            
+            const filteredSisItems = searchTerm 
+                ? sisItems.filter(item => normalizeString(item).includes(normalizeString(searchTerm)))
+                : sisItems;
+
+            // Atualiza títulos com contagem
+            document.getElementById('modal-inv-title').innerHTML = `
+                <span class="text-2xl">📋</span>
+                <span>Inventário (${filteredInvItems.length}${searchTerm ? `/${invItems.length}` : ''})</span>
+            `;
+            document.getElementById('modal-sis-title').innerHTML = `
+                <span class="text-2xl">⚙️</span>
+                <span>Sistema (${filteredSisItems.length}${searchTerm ? `/${sisItems.length}` : ''})</span>
+            `;
+
+            // Renderiza lista do Inventário
+            invList.innerHTML = '';
+            if (filteredInvItems.length === 0) {
+                invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item encontrado</li>';
+            } else {
+                filteredInvItems.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-white rounded-lg shadow hover:shadow-md transition flex items-center gap-2';
+                    
+                    // Destaca termo de busca
+                    let displayText = item;
+                    if (searchTerm) {
+                        const regex = new RegExp(`(${searchTerm})`, 'gi');
+                        displayText = item.replace(regex, '<span class="highlight">$1</span>');
+                    }
+                    
+                    li.innerHTML = `
+                        <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
+                        <span class="flex-1">${displayText}</span>
+                    `;
+                    invList.appendChild(li);
+                });
+            }
+
+            // Renderiza lista do Sistema
+            sisList.innerHTML = '';
+            if (filteredSisItems.length === 0) {
+                sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item encontrado</li>';
+            } else {
+                filteredSisItems.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-white rounded-lg shadow hover:shadow-md transition flex items-center gap-2';
+                    
+                    let displayText = item;
+                    if (searchTerm) {
+                        const regex = new RegExp(`(${searchTerm})`, 'gi');
+                        displayText = item.replace(regex, '<span class="highlight">$1</span>');
+                    }
+                    
+                    li.innerHTML = `
+                        <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
+                        <span class="flex-1">${displayText}</span>
+                    `;
+                    sisList.appendChild(li);
+                });
+            }
+        }
+
+        // Busca no modal (debounced)
+        const searchModalItems = debounce((searchTerm) => {
+            renderModalLists(currentModalData.invItems, currentModalData.sisItems, searchTerm);
+        }, 300);
 
         function closeModal() {
             const modal = document.getElementById('item-details-modal');
             const modalContent = modal.querySelector('.modal-content');
             
             modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
             modalContent.classList.add('scale-95');
+            
             setTimeout(() => {
                 modal.classList.add('hidden');
-            }, 250); // Aguarda a transição de opacidade terminar
+            }, 300);
         }
 
-
-        // Função para exportar CSV (modo único de auditoria)
+        // === EXPORTAÇÃO ===
+        
         function exportCSV() {
-            let csvContent = '';
             const selectedUnit = document.getElementById('unit-filter').value;
-            let filename = `Auditoria_de_Quantidade_${selectedUnit === 'all' ? 'Geral' : selectedUnit}.csv`;
+            const timestamp = new Date().toISOString().slice(0,10);
+            let filename = `Auditoria_Quantidade_${selectedUnit === 'all' ? 'Geral' : selectedUnit}_${timestamp}.csv`;
 
-            // Filtra os dados que serão exportados
             const filteredData = (selectedUnit === 'all') 
                 ? auditData 
                 : auditData.filter(item => item.unidade === selectedUnit);
 
-            // Exporta Relatório SEM TOMBO
-            const headers = ['Unidade', 'Local', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
-            csvContent = headers.join(';') + '\n';
+            if (filteredData.length === 0) {
+                alert('⚠️ Não há dados para exportar com o filtro selecionado.');
+                return;
+            }
+
+            const headers = ['Unidade', 'Local', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca', 'Status'];
+            let csvContent = headers.join(';') + '\n';
             
             filteredData.forEach(item => {
+                let status = 'OK';
+                if (item.diff > 0) status = 'Falta_Sistema';
+                if (item.diff < 0) status = 'Sobra_Sistema';
+                
                 const values = [
-                    (item.unidade || '').replace(/;/g, ','),
-                    (item.local || '').replace(/;/g, ','),
+                    (item.originalUnit || item.unidade).replace(/;/g, ','),
+                    (item.originalLocal || item.local).replace(/;/g, ','),
                     item.qtdInv,
                     item.qtdSis,
-                    item.diff
+                    item.diff,
+                    status
                 ];
                 csvContent += values.join(';') + '\n';
             });
 
-            // Lógica de Download
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            // Download
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
             
-            if (link.download !== undefined) { 
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else {
-                console.error("Download is not supported in this browser.");
-            }
+            // Feedback visual
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span class="text-xl">✅</span><span>Exportado com Sucesso!</span>';
+            btn.classList.add('bg-green-600');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('bg-green-600');
+            }, 2000);
         }
 
-        // Adiciona listener para atualizar a contagem
+        // Imprimir relatório
+        function printReport() {
+            window.print();
+        }
+
+        // === INICIALIZAÇÃO ===
+        
         function setupDataListeners() {
             const inventarioTextarea = document.getElementById('list-inventario');
             const sistemaTextarea = document.getElementById('list-sistema');
             
-            const handleInput = () => {
-                 // Apenas atualiza a contagem. O parse completo será no "Analisar"
-                 const invLines = inventarioTextarea.value.trim().split('\n').filter(Boolean).length;
-                 const sisLines = sistemaTextarea.value.trim().split('\n').filter(Boolean).length;
-                 
-                 // Subtrai 1 se tiver mais que 0 (para o cabeçalho)
-                 document.getElementById('count-inventario').textContent = `Total de Linhas no Inventário: ${invLines > 0 ? invLines - 1 : 0}`;
-                 document.getElementById('count-sistema').textContent = `Total de Linhas no Sistema: ${sisLines > 0 ? sisLines - 1 : 0}`;
-            };
+            const debouncedUpdate = debounce(updateDataCount, 300);
             
-            inventarioTextarea.addEventListener('input', handleInput);
-            sistemaTextarea.addEventListener('input', handleInput);
+            inventarioTextarea.addEventListener('input', debouncedUpdate);
+            sistemaTextarea.addEventListener('input', debouncedUpdate);
+            
+            // Atalhos de teclado
+            document.addEventListener('keydown', (e) => {
+                // ESC fecha modal
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('item-details-modal');
+                    if (!modal.classList.contains('hidden')) {
+                        closeModal();
+                    }
+                }
+                
+                // Ctrl+Enter para analisar
+                if (e.ctrlKey && e.key === 'Enter') {
+                    runMasterCount();
+                }
+            });
         }
-        window.onload = setupDataListeners;
 
+        // Inicialização ao carregar página
+        window.onload = () => {
+            setupDataListeners();
+            console.log('🚀 Sistema de Auditoria Avançado carregado com sucesso!');
+        };
     </script>
 </body>
 </html>
-
