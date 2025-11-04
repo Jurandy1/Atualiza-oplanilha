@@ -128,22 +128,33 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-lg shadow-xl table-container mt-4">
-                <table class="min-w-full bg-white responsive-table">
-                    <thead class="bg-gray-100 border-b-2 border-gray-300 sticky top-0">
-                        <tr>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Unidade (Agrupada)</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Local (Agrupado)</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Agrupada)</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Qtd. Inventário</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Qtd. Sistema</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Diferença (Inv - Sis)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="results-body" class="divide-y divide-gray-200">
-                        <!-- Resultados da auditoria de quantidade serão injetados aqui -->
-                    </tbody>
-                </table>
+            <!-- REMOVIDA A TABELA ANTIGA -->
+            <!-- NOVO: Container de Cards de Discrepância -->
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                Discrepâncias Encontradas (Itens com diferença)
+            </h3>
+            <div id="discrepancy-cards-container" class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Cards de discrepância serão injetados aqui -->
+                <!-- Exemplo de card:
+                <div class="p-4 border rounded-lg shadow-md bg-red-50 border-red-300">
+                    <h3 class="text-lg font-bold text-gray-800">cadeira</h3>
+                    <p class="text-sm text-gray-600 mb-3">cras fatima / sala 01</p>
+                    <div class="flex justify-between items-center text-center px-2">
+                        <div>
+                            <span class="block text-2xl font-bold text-blue-600">5</span>
+                            <span class="text-xs font-semibold text-gray-500">Inventário</span>
+                        </div>
+                        <div>
+                            <span class="block text-2xl font-bold text-orange-600">4</span>
+                            <span class="text-xs font-semibold text-gray-500">Sistema</span>
+                        </div>
+                        <div>
+                            <span class="block text-2xl font-bold text-red-600">-1</span>
+                            <span class="text-xs font-semibold text-gray-500">Diferença</span>
+                        </div>
+                    </div>
+                </div>
+                -->
             </div>
         </div>
         
@@ -323,8 +334,10 @@
             });
 
             // Gera o relatório de auditoria
-            const resultsBody = document.getElementById('results-body');
-            resultsBody.innerHTML = '';
+            // REMOVIDO: const resultsBody = document.getElementById('results-body');
+            // NOVO: const cardsContainer = document.getElementById('discrepancy-cards-container');
+            const cardsContainer = document.getElementById('discrepancy-cards-container');
+            cardsContainer.innerHTML = '';
             
             const sortedKeys = [...allCompositeKeys].sort();
 
@@ -337,11 +350,14 @@
                 const qtdSis = sistemaMap.get(compositeKey) || 0;
                 const diff = qtdInv - qtdSis;
 
-                // Atualiza totais do resumo
-                totalInv += qtdInv;
-                totalSis += qtdSis;
+                // Processa se existir em qualquer lista
+                if (qtdInv > 0 || qtdSis > 0) { 
+                    
+                    // 1. Atualiza totais do resumo (para TODOS os itens)
+                    totalInv += qtdInv;
+                    totalSis += qtdSis;
 
-                if (qtdInv > 0 || qtdSis > 0) { // Só mostra se houver item em pelo menos uma lista
+                    // 2. Salva para exportação (para TODOS os itens, mesmo sem diferença)
                     const auditRow = {
                         unidade: unidade,
                         local: local,
@@ -351,28 +367,43 @@
                         diff: diff
                     };
                     auditData.push(auditRow); // Salva para exportação
-                    
-                    let rowClass = 'bg-white';
-                    let diffClass = 'text-gray-700';
-                    if (diff > 0) {
-                        rowClass = 'bg-green-50'; // Mais no Inventário (Falta no Sistema)
-                        diffClass = 'text-green-700 font-bold';
-                    } else if (diff < 0) {
-                        rowClass = 'bg-red-50'; // Menos no Inventário (Sobra no Sistema)
-                        diffClass = 'text-red-700 font-bold';
-                    }
 
-                    const row = document.createElement('tr');
-                    row.className = `${rowClass} hover:bg-gray-100`;
-                    row.innerHTML = `
-                        <td class="p-3 font-medium text-gray-900">${unidade}</td>
-                        <td class="p-3 font-medium text-gray-900">${local}</td>
-                        <td class="p-3 text-sm text-gray-700">${desc}</td>
-                        <td class="p-3 text-sm text-gray-700">${qtdInv}</td>
-                        <td class="p-3 text-sm text-gray-700">${qtdSis}</td>
-                        <td class="p-3 text-sm ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
-                    `;
-                    resultsBody.appendChild(row);
+                    // 3. NOVO: Cria o card APENAS SE houver discrepância
+                    if (diff !== 0) {
+                        let cardClass = 'bg-white border-gray-300';
+                        let diffClass = 'text-gray-700';
+                        let diffText = `${diff > 0 ? '+' : ''}${diff}`;
+                        
+                        if (diff > 0) { // Falta no Sistema
+                            cardClass = 'bg-green-50 border-green-300';
+                            diffClass = 'text-green-600';
+                        } else { // Sobra no Sistema
+                            cardClass = 'bg-red-50 border-red-300';
+                            diffClass = 'text-red-600';
+                        }
+                        
+                        const card = document.createElement('div');
+                        card.className = `p-4 border rounded-lg shadow-md ${cardClass}`;
+                        card.innerHTML = `
+                            <h3 class="text-lg font-bold text-gray-800">${desc}</h3>
+                            <p class="text-sm text-gray-600 mb-3">${unidade} / ${local}</p>
+                            <div class="flex justify-between items-center text-center px-2">
+                                <div>
+                                    <span class="block text-2xl font-bold text-blue-600">${qtdInv}</span>
+                                    <span class="text-xs font-semibold text-gray-500">Inventário</span>
+                                </div>
+                                <div>
+                                    <span class="block text-2xl font-bold text-orange-600">${qtdSis}</span>
+                                    <span class="text-xs font-semibold text-gray-500">Sistema</span>
+                                </div>
+                                <div>
+                                    <span class="block text-2xl font-bold ${diffClass}">${diffText}</span>
+                                    <span class="text-xs font-semibold text-gray-500">Diferença</span>
+                                </div>
+                            </div>
+                        `;
+                        cardsContainer.appendChild(card);
+                    }
                 }
             }
             
@@ -450,4 +481,5 @@
     </script>
 </body>
 </html>
+
 
