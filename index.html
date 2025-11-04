@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Análise de Quantidade por Local</title>
+    <title>Analisador de Quantidade por Local</title>
     <!-- Carregando Tailwind CSS para estilização moderna e responsiva -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -44,10 +44,10 @@
 
     <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
         <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
-            Sistema de Análise de Quantidade por Local 📈
+            Analisador de Contagem por Local 📊
         </h1>
         <p class="text-gray-600 mb-6">
-            Cole os dados (TSV/CSV) para auditar a quantidade de itens. O sistema agrupará **todos** os itens por **Unidade + Local + Descrição** e mostrará a diferença na contagem entre as duas listas.
+            Cole os dados para auditar a **contagem total de itens por local**. O sistema agrupará as linhas por **Unidade + Local** (ignorando a descrição do item) e mostrará as diferenças.
         </p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -58,10 +58,10 @@
                     1. Dados do Inventário (Fonte da Verdade)
                 </label>
                 <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Item (Descrição), Local
+                    **Usará as colunas:** Unidade, Local
                 </p>
                 <textarea id="list-inventario" class="w-full p-3 border border-inventario rounded-lg focus:ring-inventario focus:border-inventario transition duration-150" placeholder="Cole aqui os dados do Inventário, incluindo o cabeçalho..."></textarea>
-                <span id="count-inventario" class="text-sm text-gray-500 mt-1 block">Total de Itens no Inventário: 0</span>
+                <span id="count-inventario" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Inventário: 0</span>
             </div>
             
             <!-- Sistema (Destino) -->
@@ -71,14 +71,14 @@
                     2. Dados do Sistema (Estoque Atual)
                 </label>
                 <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Descrição, Localização
+                    **Usará as colunas:** Unidade, Localização
                 </p>
                 <textarea id="list-sistema" class="w-full p-3 border border-sistema rounded-lg focus:ring-sistema focus:border-sistema transition duration-150" placeholder="Cole aqui os dados do Sistema, incluindo o cabeçalho..."></textarea>
-                <span id="count-sistema" class="text-sm text-gray-500 mt-1 block">Total de Itens no Sistema: 0</span>
+                <span id="count-sistema" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Sistema: 0</span>
             </div>
         </div>
 
-        <!-- NOVO: FILTRO DE UNIDADE -->
+        <!-- FILTRO DE UNIDADE -->
         <div id="filter-container" class="mb-6 hidden">
             <label for="unit-filter" class="block text-lg font-semibold text-gray-700 mb-2">
                 Selecione a Unidade (CRAS) para Analisar:
@@ -93,7 +93,7 @@
         <!-- BOTÃO DE AÇÃO ÚNICO -->
         <div class="mb-8">
              <button onclick="runMasterCount()" class="w-full px-6 py-3 bg-primary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
-                1. Analisar Contagem por Local
+                Analisar Contagem de Itens por Local
             </button>
         </div>
         
@@ -103,16 +103,13 @@
             <h2 id="report-title" class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-primary pb-2">
                 Relatório de Auditoria de Quantidade
             </h2>
-            <p id="report-subtitle" class="text-gray-600 mb-4">
-                Este relatório agrupa **todos** os itens (com ou sem tombo) por Local e Descrição para encontrar discrepâncias de quantidade.
-            </p>
             
             <!-- Export Button -->
             <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4">
                 Exportar Auditoria CSV
             </button>
             
-            <!-- NOVO: Resumo de Totais -->
+            <!-- Resumo de Totais -->
             <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
                 <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg shadow">
                     <div class="text-3xl font-bold text-blue-600" id="summary-inv">0</div>
@@ -128,33 +125,15 @@
                 </div>
             </div>
 
-            <!-- REMOVIDA A TABELA ANTIGA -->
-            <!-- NOVO: Container de Cards de Discrepância -->
+            <!-- Container de Cards de Discrepância -->
             <h3 class="text-xl font-bold text-gray-800 mb-4">
-                Discrepâncias Encontradas (Itens com diferença)
+                Discrepâncias Encontradas (Locais com diferença)
             </h3>
+            <p id="no-discrepancy-message" class="text-gray-600 text-center p-6 bg-gray-50 rounded-lg hidden">
+                🎉 Nenhuma discrepância encontrada para esta seleção!
+            </p>
             <div id="discrepancy-cards-container" class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <!-- Cards de discrepância serão injetados aqui -->
-                <!-- Exemplo de card:
-                <div class="p-4 border rounded-lg shadow-md bg-red-50 border-red-300">
-                    <h3 class="text-lg font-bold text-gray-800">cadeira</h3>
-                    <p class="text-sm text-gray-600 mb-3">cras fatima / sala 01</p>
-                    <div class="flex justify-between items-center text-center px-2">
-                        <div>
-                            <span class="block text-2xl font-bold text-blue-600">5</span>
-                            <span class="text-xs font-semibold text-gray-500">Inventário</span>
-                        </div>
-                        <div>
-                            <span class="block text-2xl font-bold text-orange-600">4</span>
-                            <span class="text-xs font-semibold text-gray-500">Sistema</span>
-                        </div>
-                        <div>
-                            <span class="block text-2xl font-bold text-red-600">-1</span>
-                            <span class="text-xs font-semibold text-gray-500">Diferença</span>
-                        </div>
-                    </div>
-                </div>
-                -->
             </div>
         </div>
         
@@ -167,30 +146,16 @@
         let globalSistemaData = [];
         let uniqueUnits = new Set();
         
-        // Função de normalização MELHORADA para strings (resolve "12 mil" vs "12.000")
+        // Função de normalização BÁSICA (apenas remove acentos, minúsculas, espaços extras)
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
             let s = str.toLowerCase();
-            
             // 1. Remove acentos
             s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            
-            // 2. Padroniza "mil" para "000" (Ex: "12 mil btus" -> "12000 btus")
-            s = s.replace(/\b(\d+)\s*mil\b/g, '$1000'); 
-            
-            // 3. Remove pontuação de números (Ex: "12.000" -> "12000")
-            s = s.replace(/(\d+)[.,](\d+)/g, '$1$2'); 
-            
-            // 4. Padroniza unidades (Ex: "btus", "btu/h" -> "btu")
-            s = s.replace(/\bbtus\b/g, 'btu');
-            s = s.replace(/\bbtu\/h\b/g, 'btu');
-            
-            // 5. Remove caracteres especiais (incluindo os que o usuário mostrou: / .)
+            // 2. Remove caracteres especiais
             s = s.replace(/[-/.,]/g, ' '); 
-            
-            // 6. Remove espaços extras
+            // 3. Remove espaços extras
             s = s.replace(/\s+/g, ' ').trim(); 
-            
             return s;
         }
 
@@ -201,22 +166,18 @@
 
             const firstLine = lines[0];
             let separator = '\t'; // Tentativa padrão: Tab
-            if (firstLine.includes(';')) {
-                separator = ';';
-            } else if (firstLine.includes(',')) {
-                 // Conta a frequência de cada separador na primeira linha
-                const counts = { ',': (firstLine.match(/,/g) || []).length, ';': (firstLine.match(/;/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length };
-                
-                // Escolhe o separador com maior contagem (se for maior que zero)
-                if (counts[';'] > counts[','] && counts[';'] > counts['\t']) {
-                    separator = ';';
-                } else if (counts[','] > counts[';'] && counts[','] > counts['\t']) {
-                    separator = ',';
-                } else if (counts['\t'] === 0 && counts[','] === 0 && counts[';'] === 0) {
-                     separator = ' '; // Fallback para espaço se nenhum outro for encontrado
-                }
-            }
 
+            // Conta a frequência de cada separador na primeira linha
+            const counts = { ',': (firstLine.match(/,/g) || []).length, ';': (firstLine.match(/;/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length };
+            
+            // Escolhe o separador com maior contagem (se for maior que zero)
+            if (counts[';'] > counts[','] && counts[';'] > counts['\t']) {
+                separator = ';';
+            } else if (counts[','] > counts[';'] && counts[','] > counts['\t']) {
+                separator = ',';
+            } else if (counts['\t'] > 0) {
+                 separator = '\t';
+            }
 
             const rawHeaders = lines[0].split(separator).map(h => h.trim());
             const data = [];
@@ -236,18 +197,18 @@
             return data;
         }
 
-        // NOVO: Função para atualizar o filtro de unidades
+        // Função para atualizar o filtro de unidades
         function updateUnitFilter() {
             uniqueUnits = new Set();
             const filterSelect = document.getElementById('unit-filter');
             const filterContainer = document.getElementById('filter-container');
 
             // Encontra o nome da coluna "Unidade" em ambas as listas
-            const invHeader = (parseData(document.getElementById('list-inventario').value)[0] || {});
-            const invUnitCol = Object.keys(invHeader).find(k => normalizeString(k) === 'unidade');
+            const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
+            const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
             
-            const sisHeader = (parseData(document.getElementById('list-sistema').value)[0] || {});
-            const sisUnitCol = Object.keys(sisHeader).find(k => normalizeString(k) === 'unidade');
+            const sisHeader = (globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : []);
+            const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
             
             globalInventarioData.forEach(item => {
                 if(invUnitCol) uniqueUnits.add(normalizeString(item[invUnitCol] || ''));
@@ -285,67 +246,85 @@
             document.getElementById('results-container').classList.add('hidden');
             
             if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
-                console.error('Dados não foram carregados.');
-                return;
+                // Tenta carregar os dados se estiverem vazios (caso o usuário cole e clique rápido)
+                 globalInventarioData = parseData(document.getElementById('list-inventario').value);
+                 globalSistemaData = parseData(document.getElementById('list-sistema').value);
+                 if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
+                    console.error('Dados não foram carregados.');
+                    alert("Por favor, cole os dados nas duas caixas antes de analisar.");
+                    return;
+                 }
             }
 
-            // NOVO: Pega a unidade selecionada no filtro
+            // Pega a unidade selecionada no filtro
             const selectedUnit = document.getElementById('unit-filter').value;
 
             // Mostra o container de resultados
             document.getElementById('results-container').classList.remove('hidden');
 
-            const inventarioMap = new Map(); // Map<"unidade|local|descrição", Qtd>
+            const inventarioMap = new Map(); // Map<"unidade|local", Qtd>
             const sistemaMap = new Map();
             const allCompositeKeys = new Set();
             auditData = []; // Limpa auditoria anterior
             
             let totalInv = 0;
             let totalSis = 0;
+            let hasDiscrepancy = false;
 
-            // Processa Inventário (USA: Unidade, Local, Item)
+            // Encontra os nomes das colunas
+            const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
+            const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
+            const invLocalCol = invHeader.find(k => normalizeString(k) === 'local');
+            
+            const sisHeader = (globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : []);
+            const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
+            const sisLocalCol = sisHeader.find(k => normalizeString(k) === 'localizacao') || sisHeader.find(k => normalizeString(k) === 'local');
+
+            if (!invLocalCol || !sisLocalCol) {
+                alert("Erro: Não foi possível encontrar as colunas 'Local' (na Lista 1) e 'Localização' (na Lista 2). Verifique os cabeçalhos.");
+                return;
+            }
+
+            // Processa Inventário (USA: Unidade, Local)
             globalInventarioData.forEach(item => {
-                const unidade = normalizeString(item['Unidade'] || 'Sem Unidade');
+                const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'Sem Unidade') : 'sem unidade';
                 
-                // NOVO: Pula o item se não for da unidade selecionada (e não for 'all')
+                // Pula o item se não for da unidade selecionada (e não for 'all')
                 if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
                 
-                const local = normalizeString(item['Local'] || 'Sem Local');
-                const desc = normalizeString(item['Item'] || 'Sem Descrição');
-                const compositeKey = `${unidade}|${local}|${desc}`;
+                const local = normalizeString(item[invLocalCol] || 'Sem Local');
+                const compositeKey = `${unidade}|${local}`;
                 
                 allCompositeKeys.add(compositeKey);
                 inventarioMap.set(compositeKey, (inventarioMap.get(compositeKey) || 0) + 1);
             });
             
-            // Processa Sistema (USA: Unidade, Localização, Descrição)
+            // Processa Sistema (USA: Unidade, Localização)
             globalSistemaData.forEach(item => {
-                const unidade = normalizeString(item['Unidade'] || 'Sem Unidade');
+                const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'Sem Unidade') : 'sem unidade';
                 
-                // NOVO: Pula o item se não for da unidade selecionada (e não for 'all')
+                // Pula o item se não for da unidade selecionada (e não for 'all')
                 if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
 
-                const local = normalizeString(item['Localização'] || 'Sem Local');
-                const desc = normalizeString(item['Descrição'] || 'Sem Descrição');
-                const compositeKey = `${unidade}|${local}|${desc}`;
+                const local = normalizeString(item[sisLocalCol] || 'Sem Local');
+                const compositeKey = `${unidade}|${local}`;
 
                 allCompositeKeys.add(compositeKey);
                 sistemaMap.set(compositeKey, (sistemaMap.get(compositeKey) || 0) + 1);
             });
 
             // Gera o relatório de auditoria
-            // REMOVIDO: const resultsBody = document.getElementById('results-body');
-            // NOVO: const cardsContainer = document.getElementById('discrepancy-cards-container');
             const cardsContainer = document.getElementById('discrepancy-cards-container');
+            const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
             cardsContainer.innerHTML = '';
             
             const sortedKeys = [...allCompositeKeys].sort();
 
             for (const compositeKey of sortedKeys) {
                 // Ignora chaves "vazias"
-                if (compositeKey === "sem unidade|sem local|sem descrição") continue;
+                if (compositeKey === "sem unidade|sem local") continue;
                 
-                const [unidade, local, desc] = compositeKey.split('|');
+                const [unidade, local] = compositeKey.split('|');
                 const qtdInv = inventarioMap.get(compositeKey) || 0;
                 const qtdSis = sistemaMap.get(compositeKey) || 0;
                 const diff = qtdInv - qtdSis;
@@ -361,15 +340,15 @@
                     const auditRow = {
                         unidade: unidade,
                         local: local,
-                        desc: desc,
                         qtdInv: qtdInv,
                         qtdSis: qtdSis,
                         diff: diff
                     };
                     auditData.push(auditRow); // Salva para exportação
 
-                    // 3. NOVO: Cria o card APENAS SE houver discrepância
+                    // 3. Cria o card APENAS SE houver discrepância
                     if (diff !== 0) {
+                        hasDiscrepancy = true;
                         let cardClass = 'bg-white border-gray-300';
                         let diffClass = 'text-gray-700';
                         let diffText = `${diff > 0 ? '+' : ''}${diff}`;
@@ -385,8 +364,8 @@
                         const card = document.createElement('div');
                         card.className = `p-4 border rounded-lg shadow-md ${cardClass}`;
                         card.innerHTML = `
-                            <h3 class="text-lg font-bold text-gray-800">${desc}</h3>
-                            <p class="text-sm text-gray-600 mb-3">${unidade} / ${local}</p>
+                            <h3 class="text-lg font-bold text-gray-800">${local}</h3>
+                            <p class="text-sm text-gray-600 mb-3">${unidade}</p>
                             <div class="flex justify-between items-center text-center px-2">
                                 <div>
                                     <span class="block text-2xl font-bold text-blue-600">${qtdInv}</span>
@@ -407,10 +386,16 @@
                 }
             }
             
-            // NOVO: Atualiza Títulos e Resumo
+            // Mostra mensagem se não houver discrepâncias
+            if (!hasDiscrepancy) {
+                noDiscrepancyMsg.classList.remove('hidden');
+            } else {
+                noDiscrepancyMsg.classList.add('hidden');
+            }
+
+            // Atualiza Títulos e Resumo
             const unitText = selectedUnit === 'all' ? 'Geral (Todas as Unidades)' : selectedUnit.toUpperCase();
             document.getElementById('report-title').textContent = `Relatório de Auditoria: ${unitText}`;
-            document.getElementById('report-subtitle').textContent = `Comparação de quantidade de itens para ${selectedUnit === 'all' ? 'todas as unidades' : 'a unidade ' + unitText}.`;
             
             document.getElementById('summary-inv').textContent = totalInv;
             document.getElementById('summary-sis').textContent = totalSis;
@@ -426,14 +411,13 @@
             let filename = `Auditoria_de_Quantidade_${selectedUnit === 'all' ? 'Geral' : selectedUnit}.csv`;
 
             // Exporta Relatório SEM TOMBO
-            const headers = ['Unidade', 'Local', 'Descricao', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
+            const headers = ['Unidade', 'Local', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
             csvContent = headers.join(';') + '\n';
             
             auditData.forEach(item => {
                 const values = [
                     (item.unidade || '').replace(/;/g, ','),
                     (item.local || '').replace(/;/g, ','),
-                    (item.desc || '').replace(/;/g, ','),
                     item.qtdInv,
                     item.qtdSis,
                     item.diff
@@ -465,10 +449,10 @@
             
             const handleInput = () => {
                  globalInventarioData = parseData(inventarioTextarea.value);
-                 globalSistemaData = parseData(sistemaTextarea.value);
+                 globalSistemaData = parseData(document.getElementById('list-sistema').value);
                  
-                 document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${globalInventarioData.length}`;
-                 document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${globalSistemaData.length}`;
+                 document.getElementById('count-inventario').textContent = `Total de Linhas no Inventário: ${globalInventarioData.length}`;
+                 document.getElementById('count-sistema').textContent = `Total de Linhas no Sistema: ${globalSistemaData.length}`;
                  
                  updateUnitFilter(); // Atualiza o filtro de unidade
             };
@@ -481,5 +465,4 @@
     </script>
 </body>
 </html>
-
 
