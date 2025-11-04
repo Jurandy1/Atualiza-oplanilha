@@ -850,6 +850,16 @@
             };
         }
 
+        // *** NOVO: Helper global para agrupar itens ***
+        function groupItems(items) {
+            const grouped = new Map();
+            items.forEach(item => {
+                const trimmedItem = item.trim();
+                grouped.set(trimmedItem, (grouped.get(trimmedItem) || 0) + 1);
+            });
+            return grouped;
+        }
+
         // === ANÁLISE PRINCIPAL ===
         
         async function runMasterCount() {
@@ -862,7 +872,8 @@
                 globalSistemaData = parseData(document.getElementById('list-sistema').value);
                 
                 if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
-                    alert("⚠️ Por favor, cole os dados antes de analisar.");
+                    // Substituído alert por um modal customizado
+                    showCustomAlert("⚠️ Por favor, cole os dados antes de analisar.");
                     showLoading(false);
                     return;
                 }
@@ -885,11 +896,12 @@
                         behavior: 'smooth', 
                         block: 'start' 
                     });
-                }, 300);
+                }, 300); // <-- CORREÇÃO: Fechamento do setTimeout que faltava
                 
-            } catch (error) {
+            } catch (error) { // <-- CORREÇÃO: Bloco catch agora segue o 'try' corretamente
                 console.error('Erro:', error);
-                alert('❌ Erro ao processar dados.');
+                // Substituído alert por um modal customizado
+                showCustomAlert(`❌ Erro ao processar: ${error.message}`);
                 showLoading(false);
             }
         }
@@ -913,11 +925,37 @@
                                sisHeader.find(k => normalizeString(k) === 'local');
             const sisItemCol = sisHeader.find(k => normalizeString(k) === 'descricao') || 
                               sisHeader.find(k => normalizeString(k) === 'item');
+            
+            // *** MUDANÇA: Coluna "Quantidade" é ignorada, não é mais lida ***
+            // const sisQtdCol = sisHeader.find(k => normalizeString(k) === 'quantidade');
 
-            if (!invLocalCol || !sisLocalCol) {
-                throw new Error("Colunas não encontradas");
+
+            // === CORREÇÃO: Validação de Colunas ===
+            // Verifica as colunas obrigatórias apenas se houver dados na respectiva tabela
+            
+            if (globalInventarioData.length > 0 && !invLocalCol) {
+                throw new Error("Coluna 'Local' não encontrada nos dados do Inventário. Verifique o cabeçalho.");
             }
+            if (globalInventarioData.length > 0 && !invItemCol) {
+                throw new Error("Coluna 'Item' não encontrada nos dados do Inventário. Verifique o cabeçalho.");
+            }
+            
+            if (globalSistemaData.length > 0 && !sisLocalCol) {
+                throw new Error("Coluna 'Localização' ou 'Local' não encontrada nos dados do Sistema. Verifique o cabeçalho.");
+            }
+            if (globalSistemaData.length > 0 && !sisItemCol) {
+                throw new Error("Coluna 'Descrição' ou 'Item' não encontrada nos dados do Sistema. Verifique o cabeçalho.");
+            }
+            // *** MUDANÇA: Validação da coluna Quantidade REMOVIDA ***
+            /*
+            if (globalSistemaData.length > 0 && !sisQtdCol) {
+                throw new Error("Coluna 'Quantidade' não encontrada nos dados do Sistema. Verifique o cabeçalho.");
+            }
+            */
+            // === FIM DA CORREÇÃO ===
 
+
+            // *** MUDANÇA: Lógica de processamento do Inventário adaptada ***
             // Processa Inventário
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
@@ -930,16 +968,19 @@
                 if (!inventarioMap.has(compositeKey)) {
                     inventarioMap.set(compositeKey, { 
                         count: 0, 
-                        items: [], 
+                        items: [], // <-- MUDANÇA: De Map para Array
                         originalUnit: item[invUnitCol] || 'Sem Unidade', 
                         originalLocal: item[invLocalCol] || 'Sem Local' 
                     });
                 }
                 const data = inventarioMap.get(compositeKey);
-                data.count++;
+                data.count++; // Inventário conta linhas (1 por item)
+                
+                // *** MUDANÇA: Salva a string original do item ***
                 data.items.push(itemName.trim());
             });
             
+            // *** MUDANÇA: Lógica de processamento do Sistema adaptada ***
             // Processa Sistema
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
@@ -952,13 +993,33 @@
                 if (!sistemaMap.has(compositeKey)) {
                     sistemaMap.set(compositeKey, { 
                         count: 0, 
-                        items: [], 
+                        items: [], // <-- MUDANÇA: De Map para Array
                         originalUnit: item[sisUnitCol] || 'Sem Unidade', 
                         originalLocal: item[sisLocalCol] || 'Sem Local' 
                     });
                 }
                 const data = sistemaMap.get(compositeKey);
-                data.count++;
+                
+                // *** MUDANÇA: A quantidade é sempre 1 por linha, ignorando a coluna "Quantidade" do arquivo ***
+                let quantidade = 1;
+                
+                /* Lógica anterior removida
+                let quantidade = 0; // Inicia com 0
+                if (sisQtdCol) {
+                    const qtdVal = parseInt(item[sisQtdCol], 10);
+                    if (!isNaN(qtdVal)) {
+                        quantidade = qtdVal;
+                    } else {
+                        console.warn(`Valor inválido na coluna Quantidade: ${item[sisQtdCol]} (item: ${itemName})`);
+                    }
+                } else {
+                    quantidade = 1;
+                }
+                */
+                
+                data.count += quantidade; // Soma 1 (contagem de linha)
+                
+                // *** MUDANÇA: Salva a string original do item ***
                 data.items.push(itemName.trim());
             });
 
@@ -969,6 +1030,7 @@
                 
                 const [unidade, local] = compositeKey.split('|');
                 
+                // *** CORREÇÃO: O valor padrão de 'items' deve ser um Array [] e não um Map() ***
                 const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
                 const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
                 
@@ -993,8 +1055,8 @@
                         discrepancyDetails.set(compositeKey, {
                             unidade: auditRow.originalUnit,
                             local: auditRow.originalLocal,
-                            invItems: invData.items.sort(),
-                            sisItems: sisData.items.sort()
+                            invItems: invData.items.sort(), // <-- MUDANÇA: Passa o Array
+                            sisItems: sisData.items.sort()  // <-- MUDANÇA: Passa o Array
                         });
                     }
                 }
@@ -1087,17 +1149,21 @@
             let borderColor = 'border-gray-300';
             let icon = '📊';
             
-            if (item.diff > 0) {
-                cardClass = 'bg-gradient-to-br from-green-50 to-green-100 border-green-300';
-                diffClass = 'text-green-600';
-                borderColor = 'border-green-400';
-                icon = '⬆️';
-            } else if (item.diff < 0) {
+            // *** MUDANÇA: Lógica de cores invertida ***
+            if (item.diff > 0) { 
+                // "Falta Sistema" (Inventário > Sistema) -> RUIM
                 cardClass = 'bg-gradient-to-br from-red-50 to-red-100 border-red-300';
                 diffClass = 'text-red-600';
                 borderColor = 'border-red-400';
-                icon = '⬇️';
+                icon = '⬇️'; 
+            } else if (item.diff < 0) {
+                // "Sobra Sistema" (Sistema > Inventário) -> OK (Analisar depois)
+                cardClass = 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-300';
+                diffClass = 'text-orange-600';
+                borderColor = 'border-orange-400';
+                icon = '⬆️';
             }
+            // Se diff == 0, não cria card (lógica principal)
             
             const diffText = `${item.diff > 0 ? '+' : ''}${item.diff}`;
             
@@ -1137,19 +1203,27 @@
             
             const diffIcon = document.getElementById('diff-icon');
             const diffStatus = document.getElementById('diff-status');
+            const diffBar = document.getElementById('progress-diff');
             
+            // *** MUDANÇA: Lógica de cores invertida ***
             if (totalDiff > 0) {
-                diffIcon.textContent = '📈';
-                diffStatus.textContent = 'Falta Sistema';
-                diffStatus.className = 'status-badge bg-green-200 text-green-700';
-            } else if (totalDiff < 0) {
+                // "Falta Sistema" (Inventário > Sistema) -> RUIM
                 diffIcon.textContent = '📉';
-                diffStatus.textContent = 'Sobra Sistema';
+                diffStatus.textContent = 'Falta Sistema';
                 diffStatus.className = 'status-badge bg-red-200 text-red-700';
+                diffBar.className = 'progress-fill bg-red-500';
+            } else if (totalDiff < 0) {
+                // "Sobra Sistema" (Sistema > Inventário) -> OK (Analisar depois)
+                diffIcon.textContent = '📈';
+                diffStatus.textContent = 'Sobra Sistema';
+                diffStatus.className = 'status-badge bg-orange-200 text-orange-700';
+                diffBar.className = 'progress-fill bg-orange-500';
             } else {
+                // "Equilíbrio" -> BOM
                 diffIcon.textContent = '✅';
                 diffStatus.textContent = 'Equilíbrio';
                 diffStatus.className = 'status-badge bg-green-200 text-green-700';
+                diffBar.className = 'progress-fill bg-green-500'; // Mudado de cinza para verde
             }
             
             const maxValue = Math.max(totalInv, totalSis, 1);
@@ -1157,9 +1231,8 @@
             document.getElementById('progress-sis').style.width = `${(totalSis / maxValue) * 100}%`;
             
             const diffPercent = Math.abs(totalDiff) / maxValue * 100;
-            const diffBar = document.getElementById('progress-diff');
             diffBar.style.width = `${diffPercent}%`;
-            diffBar.className = `progress-fill ${totalDiff > 0 ? 'bg-green-500' : totalDiff < 0 ? 'bg-red-500' : 'bg-gray-500'}`;
+            // A classe (cor) já foi definida no if/else acima
         }
 
         const searchLocal = debounce((searchTerm) => {
@@ -1185,14 +1258,22 @@
                 btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação</span>';
                 btn.className = 'px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition flex items-center gap-2';
                 info.classList.add('hidden');
-                cancelLinking();
+                cancelLinking(); // cancelLinking vai definir linkingMode = false e rerenderizar
+                return; // Evita a rerenderização duplicada
+            }
+            
+            // *** CORREÇÃO: Usar .invItems.length e passar os Arrays ***
+            // Rerenderiza as listas para adicionar os event handlers onclick
+            // Usa os dados atuais que já estão no modal
+            if (currentModalData.invItems.length > 0 || currentModalData.sisItems.length > 0) {
+                 renderModalLists(currentModalData.invItems, currentModalData.sisItems, document.getElementById('modal-search').value);
             }
         }
 
         function cancelLinking() {
             selectedInvItem = null;
             selectedSysItem = null;
-            linkingMode = false;
+            linkingMode = false; // Garante que está falso
             document.getElementById('linking-info').classList.add('hidden');
             const btn = document.getElementById('link-mode-btn');
             btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação</span>';
@@ -1200,20 +1281,35 @@
             
             // Remove seleções visuais
             document.querySelectorAll('.item-selected').forEach(el => el.classList.remove('item-selected'));
+
+            // *** CORREÇÃO: Usar .invItems.length e passar os Arrays ***
+            // Rerenderiza as listas para remover os event handlers onclick
+            // e o estilo 'linking-mode'
+            if (currentModalData.invItems.length > 0 || currentModalData.sisItems.length > 0) {
+                 renderModalLists(currentModalData.invItems, currentModalData.sisItems, document.getElementById('modal-search').value);
+            }
         }
 
-        function selectItemForLinking(itemName, isInventory) {
+        // *** CORREÇÃO APLICADA AQUI ***
+        // A função agora aceita 'event' como o primeiro parâmetro
+        function selectItemForLinking(event, itemName, isInventory) {
             if (!linkingMode) return;
             
+            // Impede que o clique se propague, caso necessário
+            event.stopPropagation(); 
+            
+            const clickedLi = event.target.closest('li');
+            if (!clickedLi) return; // Segurança
+
             if (isInventory) {
                 selectedInvItem = itemName;
                 // Atualiza visual
                 document.querySelectorAll('#modal-inv-list .item-selected').forEach(el => el.classList.remove('item-selected'));
-                event.target.closest('li').classList.add('item-selected');
+                clickedLi.classList.add('item-selected');
             } else {
                 selectedSysItem = itemName;
                 document.querySelectorAll('#modal-sis-list .item-selected').forEach(el => el.classList.remove('item-selected'));
-                event.target.closest('li').classList.add('item-selected');
+                clickedLi.classList.add('item-selected');
             }
             
             // Se ambos selecionados, cria vínculo
@@ -1232,7 +1328,8 @@
             
             saveLinksToStorage();
             
-            alert(`✅ Vínculo criado!\n📋 Inventário: ${invItem}\n⚙️ Sistema: ${sysItem}`);
+            // Substituído alert por um modal customizado
+            showCustomAlert(`✅ Vínculo criado!\n📋 Inventário: ${invItem}\n⚙️ Sistema: ${sysItem}`);
             
             // Reseta seleção
             selectedInvItem = null;
@@ -1242,6 +1339,7 @@
             // Rerenderiza listas
             const details = discrepancyDetails.get(currentCompositeKey);
             if (details) {
+                // *** CORREÇÃO: Passar os Arrays corretos ***
                 renderModalLists(details.invItems, details.sisItems);
             }
         }
@@ -1257,12 +1355,100 @@
             }
         }
 
+        // Função de confirmação customizada
+        function showCustomConfirm(message, onConfirm) {
+            // Remove qualquer confirmação existente
+            const existingConfirm = document.getElementById('custom-confirm');
+            if (existingConfirm) existingConfirm.remove();
+            
+            const confirmDiv = document.createElement('div');
+            confirmDiv.id = 'custom-confirm';
+            confirmDiv.className = 'modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 opacity-0 transition-opacity duration-300';
+            
+            confirmDiv.innerHTML = `
+                <div class="modal-content bg-white w-full max-w-md rounded-2xl shadow-2xl transform scale-95 transition-all duration-300 p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">${message}</h3>
+                    <div class="flex justify-end gap-3">
+                        <button id="confirm-btn-no" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition">
+                            Cancelar
+                        </button>
+                        <button id="confirm-btn-yes" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition">
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(confirmDiv);
+            
+            const modalContent = confirmDiv.querySelector('.modal-content');
+            
+            // Animação de entrada
+            setTimeout(() => {
+                confirmDiv.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+            
+            const closeConfirm = () => {
+                confirmDiv.classList.add('opacity-0');
+                modalContent.classList.add('scale-95');
+                setTimeout(() => confirmDiv.remove(), 300);
+            };
+            
+            document.getElementById('confirm-btn-yes').onclick = () => {
+                onConfirm();
+                closeConfirm();
+            };
+            document.getElementById('confirm-btn-no').onclick = closeConfirm;
+        }
+
+        // Função de alerta customizada
+        function showCustomAlert(message) {
+            // Remove qualquer alerta existente
+            const existingAlert = document.getElementById('custom-alert');
+            if (existingAlert) existingAlert.remove();
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'custom-alert';
+            alertDiv.className = 'modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 opacity-0 transition-opacity duration-300';
+            
+            alertDiv.innerHTML = `
+                <div class="modal-content bg-white w-full max-w-md rounded-2xl shadow-2xl transform scale-95 transition-all duration-300 p-6">
+                    <p class="text-gray-700 whitespace-pre-line mb-6">${message}</p>
+                    <div class="flex justify-end">
+                        <button id="alert-btn-ok" class="px-8 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg transition">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            const modalContent = alertDiv.querySelector('.modal-content');
+            
+            // Animação de entrada
+            setTimeout(() => {
+                alertDiv.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+            
+            const closeAlert = () => {
+                alertDiv.classList.add('opacity-0');
+                modalContent.classList.add('scale-95');
+                setTimeout(() => alertDiv.remove(), 300);
+            };
+            
+            document.getElementById('alert-btn-ok').onclick = closeAlert;
+        }
+
+
         function clearAllLinks() {
-            if (confirm('⚠️ Tem certeza que deseja limpar TODAS as vinculações?')) {
+            showCustomConfirm('⚠️ Tem certeza que deseja limpar TODAS as vinculações?', () => {
                 itemLinks.clear();
                 saveLinksToStorage();
-                alert('✅ Todas as vinculações foram removidas!');
-            }
+                showCustomAlert('✅ Todas as vinculações foram removidas!');
+            });
         }
 
         function reanalyzeWithLinks() {
@@ -1272,6 +1458,7 @@
 
         // === MODAL ===
         
+        // *** MUDANÇA: ajustado para nova estrutura de dados ***
         let currentModalData = { invItems: [], sisItems: [] };
         
         function openModal(compositeKey) {
@@ -1288,6 +1475,7 @@
             document.getElementById('modal-subtitle').textContent = `🏢 ${details.unidade}`;
             document.getElementById('modal-search').value = '';
             
+            // *** MUDANÇA: passa os Arrays em vez de Maps ***
             renderModalLists(details.invItems, details.sisItems);
 
             modal.classList.remove('hidden');
@@ -1298,61 +1486,43 @@
             }, 10);
         }
 
+        // *** MUDANÇA: ajustado para nova estrutura de dados (Arrays) ***
         function renderModalLists(invItems, sisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
             const sisList = document.getElementById('modal-sis-list');
             
-            // Agrupa itens
-            function groupItems(items) {
-                const grouped = new Map();
-                items.forEach(item => {
-                    const trimmedItem = item.trim();
-                    if (grouped.has(trimmedItem)) {
-                        grouped.set(trimmedItem, grouped.get(trimmedItem) + 1);
-                    } else {
-                        grouped.set(trimmedItem, 1);
-                    }
-                });
-                return Array.from(grouped, ([name, qty]) => ({ name, qty }))
-                    .sort((a, b) => a.name.localeCompare(b.name));
-            }
-            
-            const groupedInvItems = groupItems(invItems);
-            const groupedSisItems = groupItems(sisItems);
+            // *** MUDANÇA: Agrupa os itens aqui para análise ***
+            const invQtyMap = groupItems(invItems);
+            const sisQtyMap = groupItems(sisItems);
             
             // Aplica vinculações
             const locationLinks = itemLinks.get(currentCompositeKey) || new Map();
             
-            // Cria mapas considerando vinculações
-            const invMap = new Map(groupedInvItems.map(item => [item.name, item.qty]));
-            const sisMap = new Map(groupedSisItems.map(item => [item.name, item.qty]));
-            
-            // Aplica links
+            // Cria set de itens do sistema vinculados
             const linkedSysItems = new Set();
             locationLinks.forEach((sysName, invName) => {
-                if (invMap.has(invName) && sisMap.has(sysName)) {
+                if (invQtyMap.has(invName) && sisQtyMap.has(sysName)) {
                     linkedSysItems.add(sysName);
                 }
             });
             
+            // *** MUDANÇA: Filtra a lista RAW (original) ***
             const filteredInvItems = searchTerm 
-                ? groupedInvItems.filter(item => normalizeString(item.name).includes(normalizeString(searchTerm)))
-                : groupedInvItems;
+                ? invItems.filter(name => normalizeString(name).includes(normalizeString(searchTerm)))
+                : invItems;
             
             const filteredSisItems = searchTerm 
-                ? groupedSisItems.filter(item => normalizeString(item.name).includes(normalizeString(searchTerm)))
-                : groupedSisItems;
+                ? sisItems.filter(name => normalizeString(name).includes(normalizeString(searchTerm)))
+                : sisItems;
 
-            const totalInvQty = filteredInvItems.reduce((sum, item) => sum + item.qty, 0);
-            const totalSisQty = filteredSisItems.reduce((sum, item) => sum + item.qty, 0);
-
+            // *** MUDANÇA: A contagem agora é de itens TOTAIS (linhas) ***
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
-                <span>Inventário (${totalInvQty} itens - ${filteredInvItems.length} tipos)</span>
+                <span>Inventário (${filteredInvItems.length} itens)</span>
             `;
             document.getElementById('modal-sis-title').innerHTML = `
                 <span class="text-2xl">⚙️</span>
-                <span>Sistema (${totalSisQty} itens - ${filteredSisItems.length} tipos)</span>
+                <span>Sistema (${filteredSisItems.length} itens)</span>
             `;
 
             // Renderiza Inventário
@@ -1360,44 +1530,47 @@
             if (filteredInvItems.length === 0) {
                 invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item</li>';
             } else {
-                filteredInvItems.forEach((item, index) => {
+                // *** MUDANÇA: O 'item' aqui é a string "Cadeira" (repetida) ***
+                filteredInvItems.forEach((itemName, index) => {
                     const li = document.createElement('li');
                     
-                    const linkedSysName = locationLinks.get(item.name);
+                    const linkedSysName = locationLinks.get(itemName);
                     let divergenceClass = '';
                     let divergenceBadge = '';
+                    
+                    // Pega as quantidades TOTAIS (do Map) para análise
+                    const invQty = invQtyMap.get(itemName) || 0;
                     
                     if (linkedSysName) {
                         // Item vinculado
                         divergenceClass = 'item-linked';
-                        const sisQty = sisMap.get(linkedSysName) || 0;
-                        if (item.qty === sisQty) {
-                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} ✓</span>`;
+                        const sisQty = sisQtyMap.get(linkedSysName) || 0;
+                        if (invQty === sisQty) {
+                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} ✓ (Qtd: ${invQty})</span>`;
                         } else {
-                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} (Dif: ${item.qty - sisQty})</span>`;
+                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} (Qtd: ${invQty} vs ${sisQty})</span>`;
                         }
-                    } else if (!sisMap.has(item.name)) {
+                    } else if (!sisQtyMap.has(itemName)) {
                         divergenceClass = 'item-only-inv';
-                        divergenceBadge = '<span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">⚠️ Só Inventário</span>';
-                    } else if (sisMap.get(item.name) !== item.qty) {
+                        divergenceBadge = `<span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">⚠️ Só Inventário (Qtd: ${invQty})</span>`;
+                    } else if (sisQtyMap.get(itemName) !== invQty) {
                         divergenceClass = 'item-divergent';
-                        const diff = item.qty - sisMap.get(item.name);
-                        divergenceBadge = `<span class="divergence-badge bg-red-200 text-red-800 border border-red-400">⚠️ Dif: ${diff > 0 ? '+' : ''}${diff}</span>`;
+                        const diff = invQty - sisQtyMap.get(itemName);
+                        divergenceBadge = `<span class="divergence-badge bg-red-200 text-red-800 border border-red-400">⚠️ Dif: ${diff > 0 ? '+' : ''}${diff} (Qtd: ${invQty} vs ${sisQtyMap.get(itemName)})</span>`;
                     } else {
                         divergenceClass = 'item-match';
-                        divergenceBadge = '<span class="status-badge bg-green-200 text-green-800">✓ OK</span>';
+                        divergenceBadge = `<span class="status-badge bg-green-200 text-green-800">✓ OK (Qtd: ${invQty})</span>`;
                     }
                     
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition ${divergenceClass} ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
                     if (linkingMode) {
-                        li.setAttribute('onclick', `selectItemForLinking('${item.name.replace(/'/g, "\\'")}', true)`);
+                        li.setAttribute('onclick', `selectItemForLinking(event, '${itemName.replace(/'/g, "\\'")}', true)`);
                     }
                     
                     li.innerHTML = `
                         <div class="flex items-center gap-3 mb-2">
                             <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
-                            <span class="flex-shrink-0 px-3 py-1 bg-blue-600 text-white rounded-lg font-bold text-sm shadow">${item.qty} und</span>
-                            <span class="flex-1 font-medium">${item.name}</span>
+                            <span class="flex-1 font-medium">${itemName}</span>
                         </div>
                         <div class="ml-9">${divergenceBadge}</div>
                     `;
@@ -1410,49 +1583,51 @@
             if (filteredSisItems.length === 0) {
                 sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item</li>';
             } else {
-                filteredSisItems.forEach((item, index) => {
+                // *** MUDANÇA: O 'item' aqui é a string (repetida) ***
+                filteredSisItems.forEach((itemName, index) => {
                     const li = document.createElement('li');
                     
-                    const isLinked = linkedSysItems.has(item.name);
+                    const isLinked = linkedSysItems.has(itemName);
                     let divergenceClass = '';
                     let divergenceBadge = '';
                     
+                    // Pega as quantidades TOTAIS (do Map) para análise
+                    const sisQty = sisQtyMap.get(itemName) || 0;
+
                     if (isLinked) {
                         // Item vinculado
                         divergenceClass = 'item-linked';
-                        // Encontra item inventário vinculado
                         let invName = '';
                         locationLinks.forEach((sysN, invN) => {
-                            if (sysN === item.name) invName = invN;
+                            if (sysN === itemName) invName = invN;
                         });
-                        const invQty = invMap.get(invName) || 0;
-                        if (item.qty === invQty) {
-                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} ✓</span>`;
+                        const invQty = invQtyMap.get(invName) || 0;
+                        if (sisQty === invQty) {
+                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} ✓ (Qtd: ${sisQty})</span>`;
                         } else {
-                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} (Dif: ${item.qty - invQty})</span>`;
+                            divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} (Qtd: ${sisQty} vs ${invQty})</span>`;
                         }
-                    } else if (!invMap.has(item.name)) {
+                    } else if (!invQtyMap.has(itemName)) {
                         divergenceClass = 'item-only-sys';
-                        divergenceBadge = '<span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">⚠️ Só Sistema</span>';
-                    } else if (invMap.get(item.name) !== item.qty) {
+                        divergenceBadge = `<span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">⚠️ Só Sistema (Qtd: ${sisQty})</span>`;
+                    } else if (invQtyMap.get(itemName) !== sisQty) {
                         divergenceClass = 'item-divergent';
-                        const diff = item.qty - invMap.get(item.name);
-                        divergenceBadge = `<span class="divergence-badge bg-red-200 text-red-800 border border-red-400">⚠️ Dif: ${diff > 0 ? '+' : ''}${diff}</span>`;
+                        const diff = sisQty - invQtyMap.get(itemName);
+                        divergenceBadge = `<span class="divergence-badge bg-red-200 text-red-800 border border-red-400">⚠️ Dif: ${diff > 0 ? '+' : ''}${diff} (Qtd: ${sisQty} vs ${invQtyMap.get(itemName)})</span>`;
                     } else {
                         divergenceClass = 'item-match';
-                        divergenceBadge = '<span class="status-badge bg-green-200 text-green-800">✓ OK</span>';
+                        divergenceBadge = `<span class="status-badge bg-green-200 text-green-800">✓ OK (Qtd: ${sisQty})</span>`;
                     }
                     
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition ${divergenceClass} ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
                     if (linkingMode) {
-                        li.setAttribute('onclick', `selectItemForLinking('${item.name.replace(/'/g, "\\'")}', false)`);
+                        li.setAttribute('onclick', `selectItemForLinking(event, '${itemName.replace(/'/g, "\\'")}', false)`);
                     }
                     
                     li.innerHTML = `
                         <div class="flex items-center gap-3 mb-2">
                             <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
-                            <span class="flex-shrink-0 px-3 py-1 bg-orange-600 text-white rounded-lg font-bold text-sm shadow">${item.qty} und</span>
-                            <span class="flex-1 font-medium">${item.name}</span>
+                            <span class="flex-1 font-medium">${itemName}</span>
                         </div>
                         <div class="ml-9">${divergenceBadge}</div>
                     `;
@@ -1462,6 +1637,7 @@
         }
 
         const searchModalItems = debounce((searchTerm) => {
+            // *** MUDANÇA: passa os Arrays ***
             renderModalLists(currentModalData.invItems, currentModalData.sisItems, searchTerm);
         }, 300);
 
@@ -1576,9 +1752,11 @@
                         const data = JSON.parse(event.target.result);
                         itemLinks = new Map(Object.entries(data).map(([key, val]) => [key, new Map(Object.entries(val))]));
                         saveLinksToStorage();
-                        alert('✅ Vinculações importadas com sucesso!');
+                        // Substituído alert por um modal customizado
+                        showCustomAlert('✅ Vinculações importadas com sucesso!');
                     } catch (error) {
-                        alert('❌ Erro ao importar arquivo');
+                        // Substituído alert por um modal customizado
+                        showCustomAlert('❌ Erro ao importar arquivo');
                     }
                 };
                 reader.readAsText(file);
@@ -1617,16 +1795,7 @@
                 const [unidade, local] = compositeKey.split('|');
                 const locationLinks = itemLinks.get(compositeKey) || new Map();
                 
-                // Agrupa itens
-                function groupItems(items) {
-                    const grouped = new Map();
-                    items.forEach(item => {
-                        const trimmedItem = item.trim();
-                        grouped.set(trimmedItem, (grouped.get(trimmedItem) || 0) + 1);
-                    });
-                    return grouped;
-                }
-                
+                // *** MUDANÇA: Agrupa os arrays recebidos ***
                 const invMap = groupItems(details.invItems);
                 const sisMap = groupItems(details.sisItems);
                 
@@ -1805,7 +1974,8 @@
                 : auditData.filter(item => item.unidade === selectedUnit);
 
             if (filteredData.length === 0) {
-                alert('⚠️ Não há dados para exportar.');
+                // Substituído alert por um modal customizado
+                showCustomAlert('⚠️ Não há dados para exportar.');
                 return;
             }
 
@@ -1852,10 +2022,16 @@
             
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
-                    const modal = document.getElementById('item-details-modal');
-                    if (!modal.classList.contains('hidden')) {
-                        closeModal();
-                    }
+                    // Fecha modais abertos
+                    closeModal();
+                    closeLinkManager();
+                    closeFinalReport();
+                    
+                    const confirmModal = document.getElementById('custom-confirm');
+                    if(confirmModal) confirmModal.remove();
+                    
+                    const alertModal = document.getElementById('custom-alert');
+                    if(alertModal) alertModal.remove();
                 }
                 
                 if (e.ctrlKey && e.key === 'Enter') {
@@ -1874,3 +2050,4 @@
     </script>
 </body>
 </html>
+
