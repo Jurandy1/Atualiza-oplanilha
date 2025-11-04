@@ -22,6 +22,14 @@
             }
         }
         .table-container { max-height: 700px; } /* Altura máxima para rolagem na tabela */
+
+        /* Estilos do Modal */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
         
     </style>
     <script>
@@ -44,10 +52,10 @@
 
     <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
         <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
-            Analisador de Contagem por Local 📊
+            Analisador de Quantidade por Local 📊
         </h1>
         <p class="text-gray-600 mb-6">
-            Cole os dados para auditar a **contagem total de itens por local**. O sistema agrupará as linhas por **Unidade + Local** (ignorando a descrição do item) e mostrará as diferenças.
+            Cole os dados para auditar a **contagem total de itens por local**. Clique em um card de discrepância para ver a lista de itens.
         </p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -58,7 +66,7 @@
                     1. Dados do Inventário (Fonte da Verdade)
                 </label>
                 <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Local
+                    **Usará as colunas:** Unidade, Local, Item
                 </p>
                 <textarea id="list-inventario" class="w-full p-3 border border-inventario rounded-lg focus:ring-inventario focus:border-inventario transition duration-150" placeholder="Cole aqui os dados do Inventário, incluindo o cabeçalho..."></textarea>
                 <span id="count-inventario" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Inventário: 0</span>
@@ -71,7 +79,7 @@
                     2. Dados do Sistema (Estoque Atual)
                 </label>
                 <p class="text-xs text-gray-500 mb-1">
-                    **Usará as colunas:** Unidade, Localização
+                    **Usará as colunas:** Unidade, Localização, Descrição
                 </p>
                 <textarea id="list-sistema" class="w-full p-3 border border-sistema rounded-lg focus:ring-sistema focus:border-sistema transition duration-150" placeholder="Cole aqui os dados do Sistema, incluindo o cabeçalho..."></textarea>
                 <span id="count-sistema" class="text-sm text-gray-500 mt-1 block">Total de Linhas no Sistema: 0</span>
@@ -127,17 +135,56 @@
 
             <!-- Container de Cards de Discrepância -->
             <h3 class="text-xl font-bold text-gray-800 mb-4">
-                Discrepâncias Encontradas (Locais com diferença)
+                Discrepâncias Encontradas (Clique no card para ver os itens)
             </h3>
             <p id="no-discrepancy-message" class="text-gray-600 text-center p-6 bg-gray-50 rounded-lg hidden">
                 🎉 Nenhuma discrepância encontrada para esta seleção!
             </p>
             <div id="discrepancy-cards-container" class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Cards de discrepância serão injetados aqui -->
+                <!-- Cards de discrepância clicáveis serão injetados aqui -->
             </div>
         </div>
-        
     </div>
+
+    <!-- MODAL (Janela) para Detalhes dos Itens -->
+    <div id="item-details-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeModal()">
+        <div class="modal-content bg-white w-full max-w-4xl rounded-xl shadow-2xl p-6 md:p-8 transform scale-95" onclick="event.stopPropagation()">
+            <!-- Cabeçalho do Modal -->
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <div>
+                    <h2 id="modal-title" class="text-2xl font-bold text-gray-800">Detalhes dos Itens</h2>
+                    <p id="modal-subtitle" class="text-gray-600"></p>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-3xl">&times;</button>
+            </div>
+            
+            <!-- Conteúdo do Modal (Listas Lado a Lado) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Lista Inventário -->
+                <div>
+                    <h3 id="modal-inv-title" class="text-lg font-semibold text-inventario mb-2">Itens no Inventário (0)</h3>
+                    <ul id="modal-inv-list" class="list-disc list-inside bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+                        <!-- Itens do Inventário aqui -->
+                    </ul>
+                </div>
+                <!-- Lista Sistema -->
+                <div>
+                    <h3 id="modal-sis-title" class="text-lg font-semibold text-sistema mb-2">Itens no Sistema (0)</h3>
+                    <ul id="modal-sis-list" class="list-disc list-inside bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+                        <!-- Itens do Sistema aqui -->
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Rodapé do Modal -->
+            <div class="mt-6 text-right border-t pt-4">
+                <button onclick="closeModal()" class="px-6 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-200">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // Global variable for storing audit data
@@ -145,6 +192,9 @@
         let globalInventarioData = [];
         let globalSistemaData = [];
         let uniqueUnits = new Set();
+        // Novo: Armazena os dados completos da auditoria, incluindo listas de itens
+        let discrepancyDetails = new Map();
+
         
         // Função de normalização BÁSICA (apenas remove acentos, minúsculas, espaços extras)
         function normalizeString(str) {
@@ -262,10 +312,11 @@
             // Mostra o container de resultados
             document.getElementById('results-container').classList.remove('hidden');
 
-            const inventarioMap = new Map(); // Map<"unidade|local", Qtd>
+            const inventarioMap = new Map(); // Map<"unidade|local", { count: 0, items: [] }>
             const sistemaMap = new Map();
             const allCompositeKeys = new Set();
             auditData = []; // Limpa auditoria anterior
+            discrepancyDetails.clear(); // Limpa detalhes anteriores
             
             let totalInv = 0;
             let totalSis = 0;
@@ -275,17 +326,22 @@
             const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
             const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
             const invLocalCol = invHeader.find(k => normalizeString(k) === 'local');
+            const invItemCol = invHeader.find(k => normalizeString(k) === 'item'); // Novo: Coluna do Item
             
             const sisHeader = (globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : []);
             const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
             const sisLocalCol = sisHeader.find(k => normalizeString(k) === 'localizacao') || sisHeader.find(k => normalizeString(k) === 'local');
+            const sisItemCol = sisHeader.find(k => normalizeString(k) === 'descricao') || sisHeader.find(k => normalizeString(k) === 'item'); // Novo: Coluna da Descrição
 
             if (!invLocalCol || !sisLocalCol) {
                 alert("Erro: Não foi possível encontrar as colunas 'Local' (na Lista 1) e 'Localização' (na Lista 2). Verifique os cabeçalhos.");
                 return;
             }
+             if (!invItemCol || !sisItemCol) {
+                alert("Aviso: Não foi possível encontrar as colunas 'Item' (Lista 1) ou 'Descrição' (Lista 2). O detalhamento de itens pode ficar vazio.");
+            }
 
-            // Processa Inventário (USA: Unidade, Local)
+            // Processa Inventário (USA: Unidade, Local, Item)
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'Sem Unidade') : 'sem unidade';
                 
@@ -293,13 +349,20 @@
                 if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
                 
                 const local = normalizeString(item[invLocalCol] || 'Sem Local');
+                const itemName = invItemCol ? (item[invItemCol] || 'Item sem nome') : 'Item sem nome';
                 const compositeKey = `${unidade}|${local}`;
                 
                 allCompositeKeys.add(compositeKey);
-                inventarioMap.set(compositeKey, (inventarioMap.get(compositeKey) || 0) + 1);
+                
+                if (!inventarioMap.has(compositeKey)) {
+                    inventarioMap.set(compositeKey, { count: 0, items: [] });
+                }
+                const data = inventarioMap.get(compositeKey);
+                data.count++;
+                data.items.push(itemName);
             });
             
-            // Processa Sistema (USA: Unidade, Localização)
+            // Processa Sistema (USA: Unidade, Localização, Descrição)
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'Sem Unidade') : 'sem unidade';
                 
@@ -307,10 +370,17 @@
                 if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
 
                 const local = normalizeString(item[sisLocalCol] || 'Sem Local');
+                const itemName = sisItemCol ? (item[sisItemCol] || 'Item sem nome') : 'Item sem nome';
                 const compositeKey = `${unidade}|${local}`;
 
                 allCompositeKeys.add(compositeKey);
-                sistemaMap.set(compositeKey, (sistemaMap.get(compositeKey) || 0) + 1);
+
+                if (!sistemaMap.has(compositeKey)) {
+                    sistemaMap.set(compositeKey, { count: 0, items: [] });
+                }
+                const data = sistemaMap.get(compositeKey);
+                data.count++;
+                data.items.push(itemName);
             });
 
             // Gera o relatório de auditoria
@@ -325,8 +395,12 @@
                 if (compositeKey === "sem unidade|sem local") continue;
                 
                 const [unidade, local] = compositeKey.split('|');
-                const qtdInv = inventarioMap.get(compositeKey) || 0;
-                const qtdSis = sistemaMap.get(compositeKey) || 0;
+                
+                const invData = inventarioMap.get(compositeKey) || { count: 0, items: [] };
+                const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [] };
+                
+                const qtdInv = invData.count;
+                const qtdSis = sisData.count;
                 const diff = qtdInv - qtdSis;
 
                 // Processa se existir em qualquer lista
@@ -349,6 +423,15 @@
                     // 3. Cria o card APENAS SE houver discrepância
                     if (diff !== 0) {
                         hasDiscrepancy = true;
+                        
+                        // Armazena os detalhes para o modal
+                        discrepancyDetails.set(compositeKey, {
+                            unidade: unidade,
+                            local: local,
+                            invItems: invData.items.sort(),
+                            sisItems: sisData.items.sort()
+                        });
+                        
                         let cardClass = 'bg-white border-gray-300';
                         let diffClass = 'text-gray-700';
                         let diffText = `${diff > 0 ? '+' : ''}${diff}`;
@@ -361,8 +444,10 @@
                             diffClass = 'text-red-600';
                         }
                         
-                        const card = document.createElement('div');
-                        card.className = `p-4 border rounded-lg shadow-md ${cardClass}`;
+                        // O card agora é um <button>
+                        const card = document.createElement('button');
+                        card.className = `p-4 border rounded-lg shadow-md text-left transition-transform transform hover:scale-105 ${cardClass}`;
+                        card.setAttribute('onclick', `openModal('${compositeKey}')`);
                         card.innerHTML = `
                             <h3 class="text-lg font-bold text-gray-800">${local}</h3>
                             <p class="text-sm text-gray-600 mb-3">${unidade}</p>
@@ -401,6 +486,66 @@
             document.getElementById('summary-sis').textContent = totalSis;
             const totalDiff = totalInv - totalSis;
             document.getElementById('summary-diff').textContent = `${totalDiff > 0 ? '+' : ''}${totalDiff}`;
+        }
+
+
+        // --- Funções do MODAL ---
+        function openModal(compositeKey) {
+            const details = discrepancyDetails.get(compositeKey);
+            if (!details) return;
+
+            const modal = document.getElementById('item-details-modal');
+            const modalContent = modal.querySelector('.modal-content');
+
+            // Preenche Títulos
+            document.getElementById('modal-title').textContent = `Detalhes de: ${details.local.toUpperCase()}`;
+            document.getElementById('modal-subtitle').textContent = `Unidade: ${details.unidade.toUpperCase()}`;
+
+            // Preenche Lista Inventário
+            const invList = document.getElementById('modal-inv-list');
+            invList.innerHTML = '';
+            document.getElementById('modal-inv-title').textContent = `Itens no Inventário (${details.invItems.length})`;
+            if (details.invItems.length === 0) {
+                invList.innerHTML = '<li class="text-gray-500 italic">Nenhum item encontrado.</li>';
+            } else {
+                details.invItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    invList.appendChild(li);
+                });
+            }
+
+            // Preenche Lista Sistema
+            const sisList = document.getElementById('modal-sis-list');
+            sisList.innerHTML = '';
+            document.getElementById('modal-sis-title').textContent = `Itens no Sistema (${details.sisItems.length})`;
+             if (details.sisItems.length === 0) {
+                sisList.innerHTML = '<li class="text-gray-500 italic">Nenhum item encontrado.</li>';
+            } else {
+                details.sisItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    sisList.appendChild(li);
+                });
+            }
+
+            // Exibe o Modal com animação
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('item-details-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 250); // Aguarda a transição de opacidade terminar
         }
 
 
