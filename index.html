@@ -55,7 +55,7 @@
             Analisador de Quantidade por Local 📊
         </h1>
         <p class="text-gray-600 mb-6">
-            Cole os dados para auditar a **contagem total de itens por local**. Clique em um card de discrepância para ver a lista de itens.
+            Cole os dados para auditar a **contagem total de itens por local**. O sistema mostrará as diferenças e permitirá clicar para ver os detalhes.
         </p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -86,18 +86,6 @@
             </div>
         </div>
 
-        <!-- FILTRO DE UNIDADE -->
-        <div id="filter-container" class="mb-6 hidden">
-            <label for="unit-filter" class="block text-lg font-semibold text-gray-700 mb-2">
-                Selecione a Unidade (CRAS) para Analisar:
-            </label>
-            <select id="unit-filter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150 bg-white">
-                <option value="all">-- Todas as Unidades --</option>
-                <!-- Opções de unidade serão preenchidas dinamicamente -->
-            </select>
-        </div>
-
-
         <!-- BOTÃO DE AÇÃO ÚNICO -->
         <div class="mb-8">
              <button onclick="runMasterCount()" class="w-full px-6 py-3 bg-primary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
@@ -111,13 +99,24 @@
             <h2 id="report-title" class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-primary pb-2">
                 Relatório de Auditoria de Quantidade
             </h2>
+
+            <!-- FILTRO DE UNIDADE (Agora DENTRO do resultado) -->
+            <div id="filter-container" class="mb-6 hidden">
+                <label for="unit-filter" class="block text-lg font-semibold text-gray-700 mb-2">
+                    Filtrar por Unidade (CRAS):
+                </label>
+                <select id="unit-filter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150 bg-white" onchange="filterResultCards(this.value)">
+                    <option value="all">-- Todas as Unidades --</option>
+                    <!-- Opções de unidade serão preenchidas dinamicamente -->
+                </select>
+            </div>
             
             <!-- Export Button -->
             <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4">
                 Exportar Auditoria CSV
             </button>
             
-            <!-- Resumo de Totais -->
+            <!-- Resumo de Totais (Será atualizado pelo filtro) -->
             <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
                 <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg shadow">
                     <div class="text-3xl font-bold text-blue-600" id="summary-inv">0</div>
@@ -192,7 +191,7 @@
         let globalInventarioData = [];
         let globalSistemaData = [];
         let uniqueUnits = new Set();
-        // Novo: Armazena os dados completos da auditoria, incluindo listas de itens
+        // Armazena os dados completos da auditoria, incluindo listas de itens
         let discrepancyDetails = new Map();
 
         
@@ -247,8 +246,8 @@
             return data;
         }
 
-        // Função para atualizar o filtro de unidades
-        function updateUnitFilter() {
+        // Função para PREENCHER o filtro de unidades (não mais atualizar)
+        function populateUnitFilter() {
             uniqueUnits = new Set();
             const filterSelect = document.getElementById('unit-filter');
             const filterContainer = document.getElementById('filter-container');
@@ -291,26 +290,26 @@
             }
         }
         
-        // --- FLUXO ÚNICO: Auditoria de Quantidade Mestra (Agora com filtro) ---
+        // --- FLUXO ÚNICO: Auditoria de Quantidade Mestra ---
         function runMasterCount() {
             document.getElementById('results-container').classList.add('hidden');
             
+            // Sempre (re)carrega os dados dos textareas
+            globalInventarioData = parseData(document.getElementById('list-inventario').value);
+            globalSistemaData = parseData(document.getElementById('list-sistema').value);
+            
             if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
-                // Tenta carregar os dados se estiverem vazios (caso o usuário cole e clique rápido)
-                 globalInventarioData = parseData(document.getElementById('list-inventario').value);
-                 globalSistemaData = parseData(document.getElementById('list-sistema').value);
-                 if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
-                    console.error('Dados não foram carregados.');
-                    alert("Por favor, cole os dados nas duas caixas antes de analisar.");
-                    return;
-                 }
+                alert("Por favor, cole os dados nas duas caixas antes de analisar.");
+                return;
             }
-
-            // Pega a unidade selecionada no filtro
-            const selectedUnit = document.getElementById('unit-filter').value;
 
             // Mostra o container de resultados
             document.getElementById('results-container').classList.remove('hidden');
+
+            // PREENCHE o filtro de unidades (nova lógica)
+            populateUnitFilter(); 
+            // Reseta o filtro para "Todas as Unidades"
+            document.getElementById('unit-filter').value = 'all';
 
             const inventarioMap = new Map(); // Map<"unidade|local", { count: 0, items: [] }>
             const sistemaMap = new Map();
@@ -318,10 +317,6 @@
             auditData = []; // Limpa auditoria anterior
             discrepancyDetails.clear(); // Limpa detalhes anteriores
             
-            let totalInv = 0;
-            let totalSis = 0;
-            let hasDiscrepancy = false;
-
             // Encontra os nomes das colunas
             const invHeader = (globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : []);
             const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
@@ -344,10 +339,6 @@
             // Processa Inventário (USA: Unidade, Local, Item)
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'Sem Unidade') : 'sem unidade';
-                
-                // Pula o item se não for da unidade selecionada (e não for 'all')
-                if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
-                
                 const local = normalizeString(item[invLocalCol] || 'Sem Local');
                 const itemName = invItemCol ? (item[invItemCol] || 'Item sem nome') : 'Item sem nome';
                 const compositeKey = `${unidade}|${local}`;
@@ -365,10 +356,6 @@
             // Processa Sistema (USA: Unidade, Localização, Descrição)
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'Sem Unidade') : 'sem unidade';
-                
-                // Pula o item se não for da unidade selecionada (e não for 'all')
-                if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
-
                 const local = normalizeString(item[sisLocalCol] || 'Sem Local');
                 const itemName = sisItemCol ? (item[sisItemCol] || 'Item sem nome') : 'Item sem nome';
                 const compositeKey = `${unidade}|${local}`;
@@ -383,10 +370,8 @@
                 data.items.push(itemName);
             });
 
-            // Gera o relatório de auditoria
-            const cardsContainer = document.getElementById('discrepancy-cards-container');
-            const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
-            cardsContainer.innerHTML = '';
+            // Gera o relatório de auditoria (APENAS os dados)
+            // A renderização dos cards agora é feita por filterResultCards()
             
             const sortedKeys = [...allCompositeKeys].sort();
 
@@ -406,68 +391,94 @@
                 // Processa se existir em qualquer lista
                 if (qtdInv > 0 || qtdSis > 0) { 
                     
-                    // 1. Atualiza totais do resumo (para TODOS os itens)
-                    totalInv += qtdInv;
-                    totalSis += qtdSis;
-
-                    // 2. Salva para exportação (para TODOS os itens, mesmo sem diferença)
+                    // 1. Salva para exportação E filtragem
                     const auditRow = {
+                        key: compositeKey, // Chave para o modal
                         unidade: unidade,
                         local: local,
                         qtdInv: qtdInv,
                         qtdSis: qtdSis,
                         diff: diff
                     };
-                    auditData.push(auditRow); // Salva para exportação
+                    auditData.push(auditRow); // Salva para exportação e filtragem
 
-                    // 3. Cria o card APENAS SE houver discrepância
+                    // 2. Armazena os detalhes para o modal (SE houver diferença)
                     if (diff !== 0) {
-                        hasDiscrepancy = true;
-                        
-                        // Armazena os detalhes para o modal
                         discrepancyDetails.set(compositeKey, {
                             unidade: unidade,
                             local: local,
                             invItems: invData.items.sort(),
                             sisItems: sisData.items.sort()
                         });
-                        
-                        let cardClass = 'bg-white border-gray-300';
-                        let diffClass = 'text-gray-700';
-                        let diffText = `${diff > 0 ? '+' : ''}${diff}`;
-                        
-                        if (diff > 0) { // Falta no Sistema
-                            cardClass = 'bg-green-50 border-green-300';
-                            diffClass = 'text-green-600';
-                        } else { // Sobra no Sistema
-                            cardClass = 'bg-red-50 border-red-300';
-                            diffClass = 'text-red-600';
-                        }
-                        
-                        // O card agora é um <button>
-                        const card = document.createElement('button');
-                        card.className = `p-4 border rounded-lg shadow-md text-left transition-transform transform hover:scale-105 ${cardClass}`;
-                        card.setAttribute('onclick', `openModal('${compositeKey}')`);
-                        card.innerHTML = `
-                            <h3 class="text-lg font-bold text-gray-800">${local}</h3>
-                            <p class="text-sm text-gray-600 mb-3">${unidade}</p>
-                            <div class="flex justify-between items-center text-center px-2">
-                                <div>
-                                    <span class="block text-2xl font-bold text-blue-600">${qtdInv}</span>
-                                    <span class="text-xs font-semibold text-gray-500">Inventário</span>
-                                </div>
-                                <div>
-                                    <span class="block text-2xl font-bold text-orange-600">${qtdSis}</span>
-                                    <span class="text-xs font-semibold text-gray-500">Sistema</span>
-                                </div>
-                                <div>
-                                    <span class="block text-2xl font-bold ${diffClass}">${diffText}</span>
-                                    <span class="text-xs font-semibold text-gray-500">Diferença</span>
-                                </div>
-                            </div>
-                        `;
-                        cardsContainer.appendChild(card);
                     }
+                }
+            }
+            
+            // CHAMA O FILTRO pela primeira vez (mostrando 'all')
+            filterResultCards('all');
+        }
+
+        // NOVO: Função para FILTRAR e RENDERIZAR os cards e o resumo
+        function filterResultCards(selectedUnit) {
+            const cardsContainer = document.getElementById('discrepancy-cards-container');
+            const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
+            cardsContainer.innerHTML = '';
+            
+            let totalInv = 0;
+            let totalSis = 0;
+            let hasDiscrepancy = false;
+
+            // Filtra os dados da auditoria
+            const filteredData = (selectedUnit === 'all') 
+                ? auditData 
+                : auditData.filter(item => item.unidade === selectedUnit);
+
+            for (const item of filteredData) {
+                // 1. Atualiza totais do resumo
+                totalInv += item.qtdInv;
+                totalSis += item.qtdSis;
+
+                // 2. Cria o card APENAS SE houver discrepância
+                if (item.diff !== 0) {
+                    hasDiscrepancy = true;
+                    
+                    let cardClass = 'bg-white border-gray-300';
+                    let diffClass = 'text-gray-700';
+                    let diffText = `${item.diff > 0 ? '+' : ''}${item.diff}`;
+                    
+                    if (item.diff > 0) { // Falta no Sistema
+                        cardClass = 'bg-green-50 border-green-300';
+                        diffClass = 'text-green-600';
+                    } else { // Sobra no Sistema
+                        cardClass = 'bg-red-50 border-red-300';
+                        diffClass = 'text-red-600';
+                    }
+                    
+                    // O card agora é um <button>
+                    const card = document.createElement('button');
+                    // Adiciona data-unidade para o filtro (embora o JS já filtre, isso é bom para CSS se necessário)
+                    card.setAttribute('data-unidade', item.unidade); 
+                    card.className = `p-4 border rounded-lg shadow-md text-left transition-transform transform hover:scale-105 ${cardClass}`;
+                    card.setAttribute('onclick', `openModal('${item.key}')`);
+                    card.innerHTML = `
+                        <h3 class="text-lg font-bold text-gray-800">${item.local}</h3>
+                        <p class="text-sm text-gray-600 mb-3">${item.unidade}</p>
+                        <div class="flex justify-between items-center text-center px-2">
+                            <div>
+                                <span class="block text-2xl font-bold text-blue-600">${item.qtdInv}</span>
+                                <span class="text-xs font-semibold text-gray-500">Inventário</span>
+                            </div>
+                            <div>
+                                <span class="block text-2xl font-bold text-orange-600">${item.qtdSis}</span>
+                                <span class="text-xs font-semibold text-gray-500">Sistema</span>
+                            </div>
+                            <div>
+                                <span class="block text-2xl font-bold ${diffClass}">${diffText}</span>
+                                <span class="text-xs font-semibold text-gray-500">Diferença</span>
+                            </div>
+                        </div>
+                    `;
+                    cardsContainer.appendChild(card);
                 }
             }
             
@@ -555,11 +566,16 @@
             const selectedUnit = document.getElementById('unit-filter').value;
             let filename = `Auditoria_de_Quantidade_${selectedUnit === 'all' ? 'Geral' : selectedUnit}.csv`;
 
+            // Filtra os dados que serão exportados
+            const filteredData = (selectedUnit === 'all') 
+                ? auditData 
+                : auditData.filter(item => item.unidade === selectedUnit);
+
             // Exporta Relatório SEM TOMBO
             const headers = ['Unidade', 'Local', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
             csvContent = headers.join(';') + '\n';
             
-            auditData.forEach(item => {
+            filteredData.forEach(item => {
                 const values = [
                     (item.unidade || '').replace(/;/g, ','),
                     (item.local || '').replace(/;/g, ','),
@@ -587,19 +603,19 @@
             }
         }
 
-        // Adiciona listener para atualizar a contagem E o filtro de unidade
+        // Adiciona listener para atualizar a contagem
         function setupDataListeners() {
             const inventarioTextarea = document.getElementById('list-inventario');
             const sistemaTextarea = document.getElementById('list-sistema');
             
             const handleInput = () => {
-                 globalInventarioData = parseData(inventarioTextarea.value);
-                 globalSistemaData = parseData(document.getElementById('list-sistema').value);
+                 // Apenas atualiza a contagem. O parse completo será no "Analisar"
+                 const invLines = inventarioTextarea.value.trim().split('\n').filter(Boolean).length;
+                 const sisLines = sistemaTextarea.value.trim().split('\n').filter(Boolean).length;
                  
-                 document.getElementById('count-inventario').textContent = `Total de Linhas no Inventário: ${globalInventarioData.length}`;
-                 document.getElementById('count-sistema').textContent = `Total de Linhas no Sistema: ${globalSistemaData.length}`;
-                 
-                 updateUnitFilter(); // Atualiza o filtro de unidade
+                 // Subtrai 1 se tiver mais que 0 (para o cabeçalho)
+                 document.getElementById('count-inventario').textContent = `Total de Linhas no Inventário: ${invLines > 0 ? invLines - 1 : 0}`;
+                 document.getElementById('count-sistema').textContent = `Total de Linhas no Sistema: ${sisLines > 0 ? sisLines - 1 : 0}`;
             };
             
             inventarioTextarea.addEventListener('input', handleInput);
