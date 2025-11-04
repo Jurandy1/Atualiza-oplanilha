@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reconciliação de Inventário</title>
+    <!-- Carregando Tailwind CSS para estilização moderna e responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Definindo a fonte padrão e ajustes visuais */
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
+        textarea {
+            resize: none;
+            height: 300px;
+            @apply shadow-inner;
+        }
+        /* Responsividade da tabela */
+        @media (max-width: 640px) {
+            .responsive-table th, .responsive-table td {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+                font-size: 0.75rem; /* extra small */
+            }
+        }
+        .table-container { max-height: 600px; } /* Altura máxima para rolagem na tabela */
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#10b981', /* Esmeralda */
+                        'primary-dark': '#059669',
+                        'inventario': '#3b82f6', /* Azul */
+                        'sistema': '#f97316', /* Laranja */
+                        'export': '#8b5cf6', /* Violeta */
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
+            Sistema de Reconciliação de Inventário (por CRAS/Unidade) 📊
+        </h1>
+        <p class="text-gray-600 mb-6">
+            Cole os dados diretamente das suas planilhas (Tab-Separated/TSV ou CSV) para conciliar o estoque. O sistema usará o **Tombo/Tombamento** como chave e agrupará por **Unidade** (CRAS).
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Inventário (Fonte) -->
+            <div>
+                <label for="list-inventario" class="block text-lg font-semibold text-inventario mb-2 flex items-center">
+                    <span class="mr-2">📋</span>
+                    1. Dados do Inventário (Fonte da Verdade)
+                </label>
+                <p class="text-xs text-gray-500 mb-1">
+                    **Cabeçalho Esperado:** Unidade, Item, Tombo, Local, Estado de Conservação
+                </p>
+                <textarea id="list-inventario" class="w-full p-3 border border-inventario rounded-lg focus:ring-inventario focus:border-inventario transition duration-150" placeholder="Cole aqui os dados do Inventário, incluindo o cabeçalho..."></textarea>
+                <span id="count-inventario" class="text-sm text-gray-500 mt-1 block">Total de Itens no Inventário: 0</span>
+            </div>
+            
+            <!-- Sistema (Destino) -->
+            <div>
+                <label for="list-sistema" class="block text-lg font-semibold text-sistema mb-2 flex items-center">
+                    <span class="mr-2">⚙️</span>
+                    2. Dados do Sistema (Estoque Atual)
+                </label>
+                <p class="text-xs text-gray-500 mb-1">
+                    **Cabeçalho Esperado:** Tipo, Tombamento, Descrição, Unidade, Localização, Estado, Origem da Doação, Observação, Fornecedor
+                </p>
+                <textarea id="list-sistema" class="w-full p-3 border border-sistema rounded-lg focus:ring-sistema focus:border-sistema transition duration-150" placeholder="Cole aqui os dados do Sistema, incluindo o cabeçalho..."></textarea>
+                <span id="count-sistema" class="text-sm text-gray-500 mt-1 block">Total de Itens no Sistema: 0</span>
+            </div>
+        </div>
+
+        <button onclick="reconcileInventory()" class="w-full px-6 py-3 bg-primary text-white font-bold text-xl rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
+            Realizar Reconciliação e Gerar Relatório
+        </button>
+
+        <!-- Container de Resultados -->
+        <div id="results-container" class="mt-12 hidden">
+            
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 pb-2">
+                Relatório Final de Reconciliação (Padrão Sistema)
+            </h2>
+            
+            <!-- Filtro por Unidade (CRAS) -->
+            <div id="unit-filter-container">
+                <!-- Dropdown será injetado aqui -->
+            </div>
+
+            <!-- Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
+                <div class="p-4 rounded-lg bg-blue-100 shadow-md">
+                    <p class="text-3xl font-bold text-blue-700" id="total-inventario-final">0</p>
+                    <p class="text-sm text-blue-600">Total Inventário (Base da Unidade)</p>
+                </div>
+                <div class="p-4 rounded-lg bg-green-100 shadow-md">
+                    <p class="text-3xl font-bold text-green-700" id="total-adicionar">0</p>
+                    <p class="text-sm text-green-600">Ação: Adicionar (Faltando no Sistema)</p>
+                </div>
+                <div class="p-4 rounded-lg bg-red-100 shadow-md">
+                    <p class="text-3xl font-bold text-red-700" id="total-excluir">0</p>
+                    <p class="text-sm text-red-600">Ação: Excluir (Sobrante no Sistema)</p>
+                </div>
+            </div>
+
+            <!-- Export Button -->
+            <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-violet-700 transition duration-300 transform hover:scale-[1.01] mb-4">
+                Exportar Relatório CSV (Unidade Selecionada)
+            </button>
+            
+            <!-- Tabela de Resultados -->
+            <div class="overflow-x-auto rounded-lg shadow-xl table-container">
+                <table class="min-w-full bg-white responsive-table">
+                    <thead class="bg-gray-200 border-b-2 border-gray-300 sticky top-0">
+                        <tr>
+                            <!-- Cabeçalho do Sistema + Ação -->
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ação Sugerida</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tombamento</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Localização</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Unidade</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Item)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Estado</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo/Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body" class="divide-y divide-gray-200">
+                        <!-- Resultados serão injetados aqui -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                <h3 class="text-lg font-semibold text-yellow-800 mb-2">Observação Importante sobre a Contagem</h3>
+                <p id="summary-text" class="text-yellow-700">Aguardando a análise da unidade selecionada...</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // Global variables for storing and managing data
+        let reconciledDataByUnit = {};
+        let inventarioTotalByUnit = {};
+
+        // Mapeamento de colunas do Inventário para o padrão do Sistema
+        const INVENTARIO_MAP = {
+            'Tombo': 'Tombamento',
+            'Item': 'Descrição',
+            'Local': 'Localização',
+            'Estado de Conservação': 'Estado',
+            'Unidade': 'Unidade'
+        };
+
+        const SISTEMA_HEADERS = [
+            'Tipo', 'Tombamento', 'Descrição', 'Unidade', 
+            'Localização', 'Estado', 'Origem da Doação', 
+            'Observação', 'Fornecedor'
+        ];
+
+        // Função para detetar o separador (vírgula, ponto e vírgula, ou tab) e parsear os dados
+        function parseData(text) {
+            const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+            if (lines.length === 0) return [];
+
+            const firstLine = lines[0];
+            let separator = '\t'; // Tentativa padrão: Tab
+            if (firstLine.includes(';')) {
+                separator = ';';
+            } else if (firstLine.includes(',')) {
+                 // Conta a frequência de cada separador na primeira linha
+                const counts = { ',': (firstLine.match(/,/g) || []).length, ';': (firstLine.match(/;/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length };
+                
+                // Escolhe o separador com maior contagem (se for maior que zero)
+                if (counts[';'] > counts[','] && counts[';'] > counts['\t']) {
+                    separator = ';';
+                } else if (counts[','] > counts[';'] && counts[','] > counts['\t']) {
+                    separator = ',';
+                } else if (counts['\t'] === 0 && counts[','] === 0 && counts[';'] === 0) {
+                     // Caso não haja separador, assume espaço
+                     separator = ' ';
+                }
+            }
+
+
+            const rawHeaders = lines[0].split(separator).map(h => h.trim());
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(separator).map(v => v.trim());
+                if (values.length === rawHeaders.length) {
+                    const item = {};
+                    rawHeaders.forEach((header, index) => {
+                        item[header] = values[index];
+                    });
+                    data.push(item);
+                }
+            }
+            return data;
+        }
+
+        // Função principal de reconciliação
+        function reconcileInventory() {
+            const listInventarioText = document.getElementById('list-inventario').value;
+            const listSistemaText = document.getElementById('list-sistema').value;
+            const resultsContainer = document.getElementById('results-container');
+
+            resultsContainer.classList.add('hidden');
+            
+            if (!listInventarioText.trim() && !listSistemaText.trim()) {
+                console.error('Por favor, cole os dados do Inventário e do Sistema.');
+                return;
+            }
+
+            // 1. Parsear os dados
+            const inventarioData = parseData(listInventarioText);
+            const sistemaData = parseData(listSistemaText);
+            
+            // Atualizar contagens
+            document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${inventarioData.length}`;
+            document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${sistemaData.length}`;
+            
+            // Limpar dados globais
+            reconciledDataByUnit = {};
+            inventarioTotalByUnit = {};
+            
+            // 2. Preparar Dicionários Chave (Tombo/Tombamento)
+            const inventarioMap = new Map(inventarioData.map(item => [item['Tombo']?.trim(), item]));
+            const sistemaMap = new Map(sistemaData.map(item => [item['Tombamento']?.trim(), item]));
+
+            const allTombos = new Set([...inventarioMap.keys(), ...sistemaMap.keys()].filter(key => key && key !== ''));
+            
+            // 3. Reconciliação
+            allTombos.forEach(tombo => {
+                const itemInv = inventarioMap.get(tombo);
+                const itemSis = sistemaMap.get(tombo);
+
+                let action = 'OK';
+                let sourceData = {};
+
+                // Determinar a Unidade (Prioridade: Inventário > Sistema)
+                const unit = (itemInv && itemInv['Unidade']?.trim() || itemSis && itemSis['Unidade']?.trim() || 'Unidade Desconhecida');
+                
+                // Inicializar a estrutura de dados da Unidade
+                if (!reconciledDataByUnit[unit]) {
+                    reconciledDataByUnit[unit] = {
+                        report: [],
+                        countAdicionar: 0,
+                        countExcluir: 0,
+                        totalInventario: 0
+                    };
+                }
+
+                if (itemInv) {
+                    // Contagem de itens no inventário para o resumo da unidade
+                    inventarioTotalByUnit[unit] = (inventarioTotalByUnit[unit] || 0) + 1;
+                }
+                
+                if (itemInv && itemSis) {
+                    // Item existe em ambos: Checagem de discrepância
+                    const localInv = itemInv['Local']?.trim().toLowerCase() || '';
+                    const localSis = itemSis['Localização']?.trim().toLowerCase() || '';
+                    const estadoInv = itemInv['Estado de Conservação']?.trim().toLowerCase() || '';
+                    const estadoSis = itemSis['Estado']?.trim().toLowerCase() || '';
+                    
+                    sourceData = itemSis; // Usa dados do Sistema como base
+                    if (localInv !== localSis || estadoInv !== estadoSis) {
+                        action = 'ATENÇÃO (Local/Estado Diferente)';
+                        // Adiciona Observação para clareza
+                        sourceData['Observação'] = sourceData['Observação'] ? `${sourceData['Observação']} | INV: Local="${itemInv['Local'] || ''}", Estado="${itemInv['Estado de Conservação'] || ''}"` : `INV: Local="${itemInv['Local'] || ''}", Estado="${itemInv['Estado de Conservação'] || ''}"`;
+                    }
+
+                } else if (itemInv && !itemSis) {
+                    // Item no Inventário, mas FALTA no Sistema -> ADICIONAR
+                    action = 'ADICIONAR';
+                    reconciledDataByUnit[unit].countAdicionar++;
+                    // Cria um item no padrão SISTEMA a partir do INVENTÁRIO
+                    sourceData = {};
+                    for (const keyInv in INVENTARIO_MAP) {
+                        const keySis = INVENTARIO_MAP[keyInv];
+                        sourceData[keySis] = itemInv[keyInv] || '';
+                    }
+                    // Preenche dados vazios para as colunas extras do SISTEMA
+                    SISTEMA_HEADERS.forEach(h => {
+                        if (!sourceData[h]) sourceData[h] = '';
+                    });
+                    sourceData['Tipo'] = 'NOVO ITEM'; 
+                    sourceData['Observação'] = `Ação: ADICIONAR. Baseado em Inventário. Local: ${itemInv['Local'] || ''}`;
+
+                } else if (!itemInv && itemSis) {
+                    // Item no Sistema, mas SOBRA no Inventário -> EXCLUIR
+                    action = 'EXCLUIR';
+                    reconciledDataByUnit[unit].countExcluir++;
+                    sourceData = itemSis; // Usa dados do Sistema
+                    sourceData['Observação'] = sourceData['Observação'] ? `[EXCLUIR] ${sourceData['Observação']}` : '[EXCLUIR] Item não encontrado no Inventário Base.';
+                }
+
+                // Adicionar o resultado ao relatório final da Unidade
+                reconciledDataByUnit[unit].report.push({
+                    action: action,
+                    unit: unit,
+                    ...sourceData
+                });
+            });
+
+            // Finaliza o total de inventário de cada unidade
+            Object.keys(inventarioTotalByUnit).forEach(unit => {
+                if (reconciledDataByUnit[unit]) {
+                    reconciledDataByUnit[unit].totalInventario = inventarioTotalByUnit[unit];
+                }
+            });
+
+            // 4. Setup Unit Filter and Initial Render
+            setupUnitFilter();
+            resultsContainer.classList.remove('hidden');
+        }
+
+        // Função para configurar o filtro de Unidades (CRAS)
+        function setupUnitFilter() {
+            const filterContainer = document.getElementById('unit-filter-container');
+            filterContainer.innerHTML = '';
+            
+            const units = Object.keys(reconciledDataByUnit).sort((a, b) => a.localeCompare(b));
+            
+            if (units.length === 0) {
+                filterContainer.innerHTML = '<p class="text-gray-500">Nenhuma Unidade com Tombo encontrado para análise.</p>';
+                return;
+            }
+
+            const selectHtml = `
+                <div class="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-3 mb-4 p-3 bg-indigo-50 rounded-xl shadow-md">
+                    <label for="unit-selector" class="font-bold text-indigo-800 text-lg whitespace-nowrap">Filtrar por Unidade (CRAS):</label>
+                    <select id="unit-selector" onchange="renderReport(this.value)" class="p-2 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full md:w-auto shadow-sm">
+                        <option value="ALL">Mostrar Todas as Unidades (${units.length})</option>
+                        ${units.map(unit => `<option value="${unit}">${unit}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+            filterContainer.innerHTML = selectHtml;
+            
+            // Renderiza o relatório completo inicialmente
+            renderReport('ALL');
+        }
+
+
+        // Função para renderizar o relatório para a(s) unidade(s) selecionada(s)
+        function renderReport(selectedUnit) {
+            const resultsBody = document.getElementById('results-body');
+            resultsBody.innerHTML = '';
+            
+            let reportToRender = [];
+            let currentTotalInventario = 0;
+            let currentCountAdicionar = 0;
+            let currentCountExcluir = 0;
+            
+            const unitsToProcess = selectedUnit === 'ALL' ? Object.keys(reconciledDataByUnit) : [selectedUnit];
+
+            unitsToProcess.forEach(unit => {
+                if (reconciledDataByUnit[unit]) {
+                    reportToRender.push(...reconciledDataByUnit[unit].report);
+                    currentTotalInventario += reconciledDataByUnit[unit].totalInventario;
+                    currentCountAdicionar += reconciledDataByUnit[unit].countAdicionar;
+                    currentCountExcluir += reconciledDataByUnit[unit].countExcluir;
+                }
+            });
+
+            // 4. Ordenação: Ação (ADICIONAR > EXCLUIR > ATENÇÃO > OK) > Unidade > Localização
+            reportToRender.sort((a, b) => {
+                const actionOrder = { 'ADICIONAR': 3, 'EXCLUIR': 2, 'ATENÇÃO (Local/Estado Diferente)': 1, 'OK': 0 };
+                
+                const orderDiff = actionOrder[b.action] - actionOrder[a.action];
+                if (orderDiff !== 0) return orderDiff;
+
+                // 2º critério: Unidade (para agrupar no modo ALL)
+                const unitA = a.unit?.trim().toLowerCase() || '';
+                const unitB = b.unit?.trim().toLowerCase() || '';
+                const unitDiff = unitA.localeCompare(unitB);
+                if (unitDiff !== 0) return unitDiff;
+
+                // 3º critério: Localização
+                const localA = a.Localização?.trim().toLowerCase() || '';
+                const localB = b.Localização?.trim().toLowerCase() || '';
+                return localA.localeCompare(localB);
+            });
+            
+            // Update summary panel
+            document.getElementById('total-inventario-final').textContent = currentTotalInventario;
+            document.getElementById('total-adicionar').textContent = currentCountAdicionar;
+            document.getElementById('total-excluir').textContent = currentCountExcluir;
+            
+            // 5. Geração da Tabela (Rendering rows)
+            reportToRender.forEach(item => {
+                const row = document.createElement('tr');
+                let actionClass = 'bg-gray-50 text-gray-700';
+                if (item.action === 'ADICIONAR') {
+                    actionClass = 'bg-green-100 text-green-700 font-bold';
+                } else if (item.action === 'EXCLUIR') {
+                    actionClass = 'bg-red-100 text-red-700 font-bold';
+                } else if (item.action.includes('ATENÇÃO')) {
+                    actionClass = 'bg-yellow-100 text-yellow-700 font-semibold';
+                }
+
+                row.className = 'hover:bg-gray-50 transition duration-100';
+                
+                const tombamentoCell = item['Tombamento'] ? `<td class="p-3 font-medium text-gray-900">${item['Tombamento']}</td>` : '<td class="p-3 text-gray-500 italic">SEM TOMBO</td>';
+                const localizacaoCell = item['Localização'] ? `<td class="p-3 font-medium text-gray-800">${item['Localização']}</td>` : '<td class="p-3 text-gray-500 italic">SEM LOCAL</td>';
+                const unidadeCell = `<td class="p-3 text-sm text-gray-700">${item['Unidade'] || item.unit || ''}</td>`;
+                const descricaoCell = `<td class="p-3 text-sm text-gray-700">${item['Descrição'] || ''}</td>`;
+                const estadoCell = `<td class="p-3 text-sm text-gray-700">${item['Estado'] || ''}</td>`;
+                
+                // Coluna Tipo/Observação: junta Tipo, Origem Doação, Fornecedor e Observação
+                const obsDetails = [item['Origem da Doação'], item['Fornecedor']].filter(d => d).join('; ');
+                const tipoObsContent = [item['Tipo'], obsDetails, item['Observação']].filter(d => d).join(' | ');
+
+                const tipoObsCell = `<td class="p-3 text-sm text-gray-600 rounded-r-lg">${tipoObsContent}</td>`;
+
+                row.innerHTML = `
+                    <td class="p-3 font-semibold whitespace-nowrap ${actionClass} rounded-l-lg">${item.action}</td>
+                    ${tombamentoCell}
+                    ${localizacaoCell}
+                    ${unidadeCell}
+                    ${descricaoCell}
+                    ${estadoCell}
+                    ${tipoObsCell}
+                `;
+                resultsBody.appendChild(row);
+            });
+            
+            // Update summary text
+            let totalItemsReported = reportToRender.length;
+            let inventarioDelta = currentCountAdicionar - currentCountExcluir;
+            
+            document.getElementById('summary-text').innerHTML = `
+                <p>O relatório para **${selectedUnit === 'ALL' ? 'Todas as Unidades' : selectedUnit}** contém **${totalItemsReported} itens únicos** (OK + ADICIONAR + EXCLUIR). </p>
+                <p>O Inventário Base da ${selectedUnit === 'ALL' ? 'área total' : selectedUnit} possui **${currentTotalInventario}** itens. </p>
+                <p>A diferença líquida de itens (Adicionar - Excluir) é de: <strong class="${inventarioDelta > 0 ? 'text-green-600' : inventarioDelta < 0 ? 'text-red-600' : 'text-gray-600'}">${inventarioDelta}</strong>. É a quantidade que falta ajustar para o estoque bater.</p>
+            `;
+        }
+
+        // Função para exportar o relatório atual (filtrado ou completo) como CSV
+        function exportCSV() {
+            const selector = document.getElementById('unit-selector');
+            const selectedUnit = selector.value;
+            
+            let reportToRender = [];
+            const unitsToProcess = selectedUnit === 'ALL' ? Object.keys(reconciledDataByUnit) : [selectedUnit];
+
+            unitsToProcess.forEach(unit => {
+                if (reconciledDataByUnit[unit]) {
+                    reconciledDataByUnit[unit].report.forEach(item => {
+                         reportToRender.push(item);
+                    });
+                }
+            });
+            
+            // Ordenação (garantir que a exportação siga a ordem da tela)
+            reportToRender.sort((a, b) => {
+                const actionOrder = { 'ADICIONAR': 3, 'EXCLUIR': 2, 'ATENÇÃO (Local/Estado Diferente)': 1, 'OK': 0 };
+                
+                const orderDiff = actionOrder[b.action] - actionOrder[a.action];
+                if (orderDiff !== 0) return orderDiff;
+
+                const unitA = a.unit?.trim().toLowerCase() || '';
+                const unitB = b.unit?.trim().toLowerCase() || '';
+                const unitDiff = unitA.localeCompare(unitB);
+                if (unitDiff !== 0) return unitDiff;
+
+                const localA = a.Localização?.trim().toLowerCase() || '';
+                const localB = b.Localização?.trim().toLowerCase() || '';
+                return localA.localeCompare(localB);
+            });
+
+
+            // Define CSV headers (Ação + SISTEMA_HEADERS)
+            const headers = ['Ação Sugerida', ...SISTEMA_HEADERS];
+            
+            let csvContent = headers.join(';') + '\n'; // Usa ponto e vírgula como separador
+            
+            reportToRender.forEach(item => {
+                const values = [];
+                values.push(item.action); // Ação Sugerida
+                SISTEMA_HEADERS.forEach(header => {
+                    let value = (item[header] || '').replace(/;/g, ',').replace(/\n/g, ' ').trim(); // Sanitiza valor
+                    values.push(value);
+                });
+                csvContent += values.join(';') + '\n';
+            });
+            
+            const unitName = selectedUnit === 'ALL' ? 'Geral' : selectedUnit.replace(/[^a-zA-Z0-9]/g, '_');
+            const filename = `Reconciliacao_Inventario_${unitName}.csv`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                console.error("Download is not supported in this browser.");
+            }
+        }
+
+        // Adiciona listener para atualizar a contagem enquanto digita/cola
+        function setupCountListeners() {
+            document.getElementById('list-inventario').addEventListener('input', () => {
+                 const data = parseData(document.getElementById('list-inventario').value);
+                 document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${data.length}`;
+            });
+            document.getElementById('list-sistema').addEventListener('input', () => {
+                 const data = parseData(document.getElementById('list-sistema').value);
+                 document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${data.length}`;
+            });
+        }
+        window.onload = setupCountListeners;
+
+    </script>
+</body>
+</html>
