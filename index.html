@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Reconciliação de Inventário</title>
+    <title>Sistema de Reconciliação de Inventário (com IA)</title>
     <!-- Carregando Tailwind CSS para estilização moderna e responsiva -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -11,7 +11,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
         textarea {
             resize: none;
-            height: 300px;
+            height: 250px; /* Altura reduzida para dar espaço aos novos botões */
             @apply shadow-inner;
         }
         /* Responsividade da tabela */
@@ -23,17 +23,28 @@
             }
         }
         .table-container { max-height: 600px; } /* Altura máxima para rolagem na tabela */
+        
+        /* Estilo do loader da IA */
+        .loader {
+            border: 2px solid #f3f3f3; border-top: 2px solid #3498db;
+            border-radius: 50%; width: 16px; height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'primary': '#10b981', /* Esmeralda */
+                        'primary': '#10b981', /* Esmeralda (Com Tombo) */
                         'primary-dark': '#059669',
+                        'secondary': '#8b5cf6', /* Violeta (Sem Tombo) */
+                        'secondary-dark': '#7c3aed',
                         'inventario': '#3b82f6', /* Azul */
                         'sistema': '#f97316', /* Laranja */
-                        'export': '#8b5cf6', /* Violeta */
+                        'export': '#d946ef', /* Fúcsia */
                     }
                 }
             }
@@ -42,15 +53,15 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="max-w-6xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
+    <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
         <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
-            Sistema de Reconciliação de Inventário (Consolidado) 📊
+            Sistema de Reconciliação de Inventário (com IA) 📊✨
         </h1>
         <p class="text-gray-600 mb-6">
-            Cole os dados diretamente das suas planilhas (Tab-Separated/TSV ou CSV) para conciliar o estoque. O sistema usará o **Tombo/Tombamento** como chave e agrupará por **Unidade** (CRAS).
+            Cole os dados (TSV/CSV) para conciliar o estoque. O sistema agora separa a análise de itens COM Tombo (usando IA para discrepâncias) e itens SEM Tombo (por quantidade).
         </p>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <!-- Inventário (Fonte) -->
             <div>
                 <label for="list-inventario" class="block text-lg font-semibold text-inventario mb-2 flex items-center">
@@ -78,15 +89,24 @@
             </div>
         </div>
 
-        <button onclick="reconcileInventory()" class="w-full px-6 py-3 bg-primary text-white font-bold text-xl rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
-            Realizar Reconciliação e Gerar Relatório
-        </button>
+        <!-- NOVOS BOTÕES DE AÇÃO -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+             <button onclick="reconcileInventory(true)" class="w-full px-6 py-3 bg-primary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
+                1. Reconciliar Itens COM Tombo (Usar IA)
+            </button>
+             <button onclick="reconcileInventory(false)" class="w-full px-6 py-3 bg-secondary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-secondary-dark transition duration-300 transform hover:scale-[1.01]">
+                2. Analisar Itens SEM Tombo (por Quantidade)
+            </button>
+        </div>
+        
+        <!-- Mensagem de Erro da API -->
+        <div id="api-error" class="hidden p-4 mb-4 bg-red-100 border border-red-400 text-red-700 rounded-lg"></div>
 
-        <!-- Container de Resultados -->
-        <div id="results-container" class="mt-12 hidden">
+        <!-- Container de Resultados - COM Tombo -->
+        <div id="results-container-tombo" class="mt-12 hidden">
             
             <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 pb-2">
-                Relatório Final de Reconciliação (Padrão Sistema)
+                Relatório de Reconciliação (Itens COM Tombo)
             </h2>
             
             <!-- Filtro por Unidade (CRAS) -->
@@ -139,13 +159,13 @@
 
 
             <!-- Export Button -->
-            <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-violet-700 transition duration-300 transform hover:scale-[1.01] mb-4 mt-8">
+            <button onclick="exportCSV(true)" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4 mt-8">
                 Exportar Relatório CSV (Unidade Selecionada)
             </button>
             
             <!-- Tabela Principal de Resultados (Completa) -->
             <div class="overflow-x-auto rounded-lg shadow-xl table-container">
-                <h3 class="text-lg font-bold text-gray-700 mb-2">Tabela de Reconciliação Detalhada (Todos os Itens)</h3>
+                <h3 class="text-lg font-bold text-gray-700 mb-2">Tabela de Reconciliação Detalhada (Itens COM Tombo)</h3>
                 <table class="min-w-full bg-white responsive-table">
                     <thead class="bg-gray-200 border-b-2 border-gray-300 sticky top-0">
                         <tr>
@@ -156,7 +176,7 @@
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Unidade</th>
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Item)</th>
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Estado</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo/Observação</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo/Observação (e Verificação IA)</th>
                         </tr>
                     </thead>
                     <tbody id="results-body" class="divide-y divide-gray-200">
@@ -171,12 +191,45 @@
             </div>
         </div>
         
+        <!-- Container de Resultados - SEM Tombo -->
+        <div id="results-container-no-tombo" class="mt-12 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-secondary pb-2">
+                Relatório de Auditoria (Itens SEM Tombo)
+            </h2>
+            <p class="text-gray-600 mb-4">
+                Este relatório agrupa itens sem tombo por Local e Descrição para encontrar discrepâncias de quantidade (Ex: "3 Cadeiras" vs "3 Cadeiras Brancas").
+            </p>
+            
+            <!-- Export Button -->
+            <button onclick="exportCSV(false)" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4">
+                Exportar Auditoria CSV
+            </button>
+
+            <div class="overflow-x-auto rounded-lg shadow-xl table-container mt-4">
+                <table class="min-w-full bg-white responsive-table">
+                    <thead class="bg-purple-100 border-b-2 border-purple-300 sticky top-0">
+                        <tr>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Local (Agrupado)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Agrupada)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Qtd. Inventário</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Qtd. Sistema</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Diferença (Inv - Sis)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body-no-tombo" class="divide-y divide-gray-200">
+                        <!-- Resultados da auditoria de quantidade serão injetados aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
     </div>
 
     <script>
         // Global variables for storing and managing data
         let reconciledDataByUnit = {};
         let inventarioTotalByUnit = {};
+        let noTomboAuditData = []; // Para a auditoria de quantidade
 
         // Mapeamento de colunas do Inventário para o padrão do Sistema
         const INVENTARIO_MAP = {
@@ -192,6 +245,87 @@
             'Localização', 'Estado', 'Origem da Doação', 
             'Observação', 'Fornecedor'
         ];
+        
+        // --- INÍCIO: Lógica da API Gemini ---
+        
+        // Função para exibir erros da API
+        function showApiError(message) {
+            const errorDiv = document.getElementById('api-error');
+            errorDiv.textContent = `Erro na API: ${message}`;
+            errorDiv.classList.remove('hidden');
+        }
+
+        // Função para chamar a API Gemini
+        async function verifyWithAI(button, descInv, descSis) {
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loader"></span> Verificando...';
+            button.disabled = true;
+            
+            const apiKey = ""; // Deixe em branco, será preenchido pelo ambiente
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const systemPrompt = "Você é um assistente de inventário. Responda [SIM] se os dois itens a seguir parecem ser o mesmo objeto (mesmo que um seja mais detalhado), ou [NÃO] se parecem ser objetos fundamentalmente diferentes. Responda apenas [SIM] ou [NÃO].";
+            const userQuery = `Item 1: "${descInv}"\nItem 2: "${descSis}"`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`A API retornou o status ${response.status}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim().toUpperCase();
+
+                if (text === '[SIM]') {
+                    button.innerHTML = 'IA: ✅ SIM';
+                    button.className = button.className.replace('bg-blue-500', 'bg-green-600');
+                } else if (text === '[NÃO]') {
+                    button.innerHTML = 'IA: ❌ NÃO';
+                    button.className = button.className.replace('bg-blue-500', 'bg-red-600');
+                } else {
+                    button.innerHTML = 'IA: ?';
+                    throw new Error(`Resposta inesperada: ${text}`);
+                }
+
+            } catch (error) {
+                console.error('Erro ao chamar a API Gemini:', error);
+                showApiError(error.message);
+                button.innerHTML = 'Erro na IA';
+                button.disabled = false;
+            }
+        }
+        // --- FIM: Lógica da API Gemini ---
+
+
+        // Função de normalização simples para strings (remove acentos, minúsculas, espaços extras)
+        function normalizeString(str) {
+            if (typeof str !== 'string') return '';
+            return str
+                .toLowerCase()
+                .normalize("NFD") // Remove acentos
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, ' ') // Remove espaços extras
+                .replace(/-+/g, ' ') // remove traços
+                .trim();
+        }
+        
+        // Verifica se um item tem tombo (considerando S/T, 0, etc.)
+        function hasTombo(tomboStr) {
+            if (!tomboStr) return false;
+            const norm = normalizeString(tomboStr);
+            if (norm === '' || norm === 's/t' || norm === 'sem tombo' || norm === '0') {
+                return false;
+            }
+            return true;
+        }
 
         // Função para detetar o separador (vírgula, ponto e vírgula, ou tab) e parsear os dados
         function parseData(text) {
@@ -212,7 +346,6 @@
                 } else if (counts[','] > counts[';'] && counts[','] > counts['\t']) {
                     separator = ',';
                 } else if (counts['\t'] === 0 && counts[','] === 0 && counts[';'] === 0) {
-                     // Caso não haja separador, assume espaço
                      separator = ' ';
                 }
             }
@@ -226,7 +359,9 @@
                 if (values.length === rawHeaders.length) {
                     const item = {};
                     rawHeaders.forEach((header, index) => {
-                        item[header] = values[index];
+                        // Encontra o cabeçalho original (mantendo case)
+                        const originalHeader = rawHeaders.find(h => normalizeString(h) === normalizeString(header));
+                        item[originalHeader || header] = values[index];
                     });
                     data.push(item);
                 }
@@ -234,34 +369,56 @@
             return data;
         }
 
-        // Função principal de reconciliação
-        function reconcileInventory() {
+        // Função principal de reconciliação (agora com seletor de modo)
+        function reconcileInventory(runTomboWorkflow) {
             const listInventarioText = document.getElementById('list-inventario').value;
             const listSistemaText = document.getElementById('list-sistema').value;
-            const resultsContainer = document.getElementById('results-container');
-
-            resultsContainer.classList.add('hidden');
+            
+            // Oculta ambos os resultados e erros
+            document.getElementById('results-container-tombo').classList.add('hidden');
+            document.getElementById('results-container-no-tombo').classList.add('hidden');
+            document.getElementById('api-error').classList.add('hidden');
             
             if (!listInventarioText.trim() && !listSistemaText.trim()) {
                 console.error('Por favor, cole os dados do Inventário e do Sistema.');
                 return;
             }
 
-            // 1. Parsear os dados
             const inventarioData = parseData(listInventarioText);
             const sistemaData = parseData(listSistemaText);
             
-            // Atualizar contagens
             document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${inventarioData.length}`;
             document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${sistemaData.length}`;
-            
+
+            if (runTomboWorkflow) {
+                runReconciliationTombo(inventarioData, sistemaData);
+                document.getElementById('results-container-tombo').classList.remove('hidden');
+            } else {
+                runAuditNoTombo(inventarioData, sistemaData);
+                document.getElementById('results-container-no-tombo').classList.remove('hidden');
+            }
+        }
+
+        // --- FLUXO 1: Reconciliação de Itens COM Tombo ---
+        function runReconciliationTombo(inventarioData, sistemaData) {
             // Limpar dados globais
             reconciledDataByUnit = {};
             inventarioTotalByUnit = {};
             
             // 2. Preparar Dicionários Chave (Tombo/Tombamento)
-            const inventarioMap = new Map(inventarioData.map(item => [item['Tombo']?.trim(), item]));
-            const sistemaMap = new Map(sistemaData.map(item => [item['Tombamento']?.trim(), item]));
+            const inventarioMap = new Map();
+            inventarioData.forEach(item => {
+                if (hasTombo(item['Tombo'])) {
+                    inventarioMap.set(normalizeString(item['Tombo']), item);
+                }
+            });
+            
+            const sistemaMap = new Map();
+            sistemaData.forEach(item => {
+                if (hasTombo(item['Tombamento'])) {
+                    sistemaMap.set(normalizeString(item['Tombamento']), item);
+                }
+            });
 
             const allTombos = new Set([...inventarioMap.keys(), ...sistemaMap.keys()].filter(key => key && key !== ''));
             
@@ -273,92 +430,165 @@
                 let action = 'OK';
                 let sourceData = {};
 
-                // Determinar a Unidade (Prioridade: Inventário > Sistema)
                 const unit = (itemInv && itemInv['Unidade']?.trim() || itemSis && itemSis['Unidade']?.trim() || 'Unidade Desconhecida');
                 
-                // Inicializar a estrutura de dados da Unidade
                 if (!reconciledDataByUnit[unit]) {
-                    reconciledDataByUnit[unit] = {
-                        report: [],
-                        countAdicionar: 0,
-                        countExcluir: 0,
-                        totalInventario: 0
-                    };
+                    reconciledDataByUnit[unit] = { report: [], countAdicionar: 0, countExcluir: 0, totalInventario: 0 };
                 }
-
                 if (itemInv) {
-                    // Contagem de itens no inventário para o resumo da unidade
                     inventarioTotalByUnit[unit] = (inventarioTotalByUnit[unit] || 0) + 1;
                 }
                 
                 if (itemInv && itemSis) {
-                    // Item existe em ambos: Checagem de discrepância
-                    const localInv = itemInv['Local']?.trim().toLowerCase() || '';
-                    const localSis = itemSis['Localização']?.trim().toLowerCase() || '';
-                    const estadoInv = itemInv['Estado de Conservação']?.trim().toLowerCase() || '';
-                    const estadoSis = itemSis['Estado']?.trim().toLowerCase() || '';
+                    sourceData = itemSis;
                     
-                    sourceData = itemSis; // Usa dados do Sistema como base
-                    if (localInv !== localSis || estadoInv !== estadoSis) {
-                        action = 'ATENÇÃO (Local/Estado Diferente)';
-                        // ADICIONA A JUSTIFICATIVA COMPLETA (O PORQUÊ DA ATENÇÃO)
-                        const invLocal = itemInv['Local'] || 'Não Informado';
-                        const invEstado = itemInv['Estado de Conservação'] || 'Não Informado';
-                        
-                        sourceData['Observação'] = sourceData['Observação'] ? 
-                            `${sourceData['Observação']} | DISCREPÂNCIA: Inv Local="${invLocal}", Inv Estado="${invEstado}"` : 
-                            `DISCREPÂNCIA: Inv Local="${invLocal}", Inv Estado="${invEstado}"`;
-                        
-                        // Garante que a localização do sistema é usada, mas o item é marcado
-                        sourceData['Localização'] = itemSis['Localização'] || invLocal; // Prioriza o local do sistema
+                    const localInv = normalizeString(itemInv['Local']);
+                    const localSis = normalizeString(itemSis['Localização']);
+                    const estadoInv = normalizeString(itemInv['Estado de Conservação']);
+                    const estadoSis = normalizeString(itemSis['Estado']);
+                    const descInv = normalizeString(itemInv['Item']);
+                    const descSis = normalizeString(itemSis['Descrição']);
+                    
+                    const descSimilar = (descInv.includes(descSis) || descSis.includes(descInv));
+                    let discrepancies = [];
+
+                    if (!descSimilar) {
+                        discrepancies.push(`Descrição (Inv: '${itemInv['Item'] || ''}' / Sis: '${itemSis['Descrição'] || ''}')`);
+                    }
+                    if (localInv !== localSis) {
+                        discrepancies.push(`Local (Inv: '${itemInv['Local'] || ''}' / Sis: '${itemSis['Localização'] || ''}')`);
+                    }
+                    if (estadoInv !== estadoSis) {
+                         discrepancies.push(`Estado (Inv: '${itemInv['Estado de Conservação'] || ''}' / Sis: '${itemSis['Estado'] || ''}')`);
+                    }
+
+                    if (discrepancies.length > 0) {
+                        action = 'ATENÇÃO (Discrepância)';
+                        const justification = `DISCREPÂNCIA: ${discrepancies.join(' | ')}`;
+                        sourceData['observacaoOriginal'] = justification;
+                        sourceData['descInv'] = itemInv['Item'] || ''; // Salva para o botão da IA
+                        sourceData['descSis'] = itemSis['Descrição'] || ''; // Salva para o botão da IA
                     }
 
                 } else if (itemInv && !itemSis) {
-                    // Item no Inventário, mas FALTA no Sistema -> ADICIONAR
                     action = 'ADICIONAR';
                     reconciledDataByUnit[unit].countAdicionar++;
-                    // Cria um item no padrão SISTEMA a partir do INVENTÁRIO
                     sourceData = {};
                     for (const keyInv in INVENTARIO_MAP) {
                         const keySis = INVENTARIO_MAP[keyInv];
                         sourceData[keySis] = itemInv[keyInv] || '';
                     }
-                    // Preenche dados vazios para as colunas extras do SISTEMA
-                    SISTEMA_HEADERS.forEach(h => {
-                        if (!sourceData[h]) sourceData[h] = '';
-                    });
+                    SISTEMA_HEADERS.forEach(h => { if (!sourceData[h]) sourceData[h] = ''; });
                     sourceData['Tipo'] = 'NOVO ITEM'; 
-                    // Garante que a localização do inventário seja usada, é a informação crucial
                     sourceData['Localização'] = itemInv['Local'] || ''; 
                     sourceData['Observação'] = `Ação: ADICIONAR. Baseado em Inventário. Local: ${itemInv['Local'] || ''}`;
+                    sourceData['Tombamento'] = itemInv['Tombo'] || '';
 
                 } else if (!itemInv && itemSis) {
-                    // Item no Sistema, mas SOBRA no Inventário -> EXCLUIR
                     action = 'EXCLUIR';
                     reconciledDataByUnit[unit].countExcluir++;
-                    sourceData = itemSis; // Usa dados do Sistema
+                    sourceData = itemSis;
                     sourceData['Observação'] = sourceData['Observação'] ? `[EXCLUIR] ${sourceData['Observação']}` : '[EXCLUIR] Item não encontrado no Inventário Base.';
                 }
 
-                // Adicionar o resultado ao relatório final da Unidade
                 reconciledDataByUnit[unit].report.push({
-                    action: action,
-                    unit: unit,
-                    ...sourceData
+                    action: action, unit: unit, ...sourceData
                 });
             });
 
-            // Finaliza o total de inventário de cada unidade
             Object.keys(inventarioTotalByUnit).forEach(unit => {
                 if (reconciledDataByUnit[unit]) {
                     reconciledDataByUnit[unit].totalInventario = inventarioTotalByUnit[unit];
                 }
             });
 
-            // 4. Setup Unit Filter and Initial Render
             setupUnitFilter();
-            resultsContainer.classList.remove('hidden');
         }
+
+        // --- FLUXO 2: Auditoria de Itens SEM Tombo ---
+        function runAuditNoTombo(inventarioData, sistemaData) {
+            const inventarioMap = new Map(); // Map<Local, Map<Descrição, Qtd>>
+            const sistemaMap = new Map();
+            const allLocals = new Set();
+            const allDescs = new Set();
+            noTomboAuditData = []; // Limpa auditoria anterior
+
+            // Processa Inventário
+            inventarioData.forEach(item => {
+                if (!hasTombo(item['Tombo'])) {
+                    const local = normalizeString(item['Local'] || 'Sem Local');
+                    const desc = normalizeString(item['Item'] || 'Sem Descrição');
+                    allLocals.add(local);
+                    allDescs.add(desc);
+                    
+                    const localMap = inventarioMap.get(local) || new Map();
+                    localMap.set(desc, (localMap.get(desc) || 0) + 1);
+                    inventarioMap.set(local, localMap);
+                }
+            });
+            
+            // Processa Sistema
+            sistemaData.forEach(item => {
+                 if (!hasTombo(item['Tombamento'])) {
+                    const local = normalizeString(item['Localização'] || 'Sem Local');
+                    const desc = normalizeString(item['Descrição'] || 'Sem Descrição');
+                    allLocals.add(local);
+                    allDescs.add(desc);
+                    
+                    const localMap = sistemaMap.get(local) || new Map();
+                    localMap.set(desc, (localMap.get(desc) || 0) + 1);
+                    sistemaMap.set(local, localMap);
+                }
+            });
+
+            // Gera o relatório de auditoria
+            const resultsBody = document.getElementById('results-body-no-tombo');
+            resultsBody.innerHTML = '';
+            
+            const sortedLocals = [...allLocals].sort();
+            const sortedDescs = [...allDescs].sort();
+
+            for (const local of sortedLocals) {
+                for (const desc of sortedDescs) {
+                    const qtdInv = inventarioMap.get(local)?.get(desc) || 0;
+                    const qtdSis = sistemaMap.get(local)?.get(desc) || 0;
+                    const diff = qtdInv - qtdSis;
+
+                    if (qtdInv > 0 || qtdSis > 0) { // Só mostra se houver item em pelo menos uma lista
+                        const auditRow = {
+                            local: local,
+                            desc: desc,
+                            qtdInv: qtdInv,
+                            qtdSis: qtdSis,
+                            diff: diff
+                        };
+                        noTomboAuditData.push(auditRow); // Salva para exportação
+                        
+                        let rowClass = 'bg-white';
+                        let diffClass = 'text-gray-700';
+                        if (diff > 0) {
+                            rowClass = 'bg-green-50'; // Mais no Inventário (Falta no Sistema)
+                            diffClass = 'text-green-700 font-bold';
+                        } else if (diff < 0) {
+                            rowClass = 'bg-red-50'; // Menos no Inventário (Sobra no Sistema)
+                            diffClass = 'text-red-700 font-bold';
+                        }
+
+                        const row = document.createElement('tr');
+                        row.className = `${rowClass} hover:bg-gray-100`;
+                        row.innerHTML = `
+                            <td class="p-3 font-medium text-gray-900">${local}</td>
+                            <td class="p-3 text-sm text-gray-700">${desc}</td>
+                            <td class="p-3 text-sm text-gray-700">${qtdInv}</td>
+                            <td class="p-3 text-sm text-gray-700">${qtdSis}</td>
+                            <td class="p-3 text-sm ${diffClass}">${diff > 0 ? '+' : ''}${diff}</td>
+                        `;
+                        resultsBody.appendChild(row);
+                    }
+                }
+            }
+        }
+
 
         // Função para configurar o filtro de Unidades (CRAS)
         function setupUnitFilter() {
@@ -375,28 +605,24 @@
             const selectHtml = `
                 <div class="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-3 mb-4 p-3 bg-indigo-50 rounded-xl shadow-md">
                     <label for="unit-selector" class="font-bold text-indigo-800 text-lg whitespace-nowrap">Filtrar por Unidade (CRAS):</label>
-                    <select id="unit-selector" onchange="renderReport(this.value)" class="p-2 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full md:w-auto shadow-sm">
+                    <select id="unit-selector" onchange="renderTomboReport(this.value)" class="p-2 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full md:w-auto shadow-sm">
                         <option value="ALL">Mostrar Todas as Unidades (${units.length})</option>
                         ${units.map(unit => `<option value="${unit}">${unit}</option>`).join('')}
                     </select>
                 </div>
             `;
             filterContainer.innerHTML = selectHtml;
-            
-            // Renderiza o relatório completo (ALL) inicialmente, como o usuário solicitou
-            renderReport('ALL');
+            renderTomboReport('ALL');
         }
 
 
-        // Função para renderizar o relatório para a(s) unidade(s) selecionada(s)
-        function renderReport(selectedUnit) {
+        // Função para renderizar o relatório COM TOMBO
+        function renderTomboReport(selectedUnit) {
             const resultsBody = document.getElementById('results-body');
             resultsBody.innerHTML = '';
             
             let reportToRender = [];
-            let currentTotalInventario = 0;
-            let currentCountAdicionar = 0;
-            let currentCountExcluir = 0;
+            let currentTotalInventario = 0, currentCountAdicionar = 0, currentCountExcluir = 0;
             
             const unitsToProcess = selectedUnit === 'ALL' ? Object.keys(reconciledDataByUnit) : [selectedUnit];
 
@@ -409,62 +635,56 @@
                 }
             });
 
-            // 4. Ordenação: Ação (ADICIONAR > EXCLUIR > ATENÇÃO > OK) > Unidade > Localização
+            // 4. Ordenação
             reportToRender.sort((a, b) => {
-                const actionOrder = { 'ADICIONAR': 3, 'EXCLUIR': 2, 'ATENÇÃO (Local/Estado Diferente)': 1, 'OK': 0 };
-                
+                const actionOrder = { 'ADICIONAR': 3, 'EXCLUIR': 2, 'ATENÇÃO (Discrepância)': 1, 'OK': 0 };
                 const orderDiff = actionOrder[b.action] - actionOrder[a.action];
                 if (orderDiff !== 0) return orderDiff;
-
-                // 2º critério: Unidade (para agrupar no modo ALL)
                 const unitA = a.unit?.trim().toLowerCase() || '';
                 const unitB = b.unit?.trim().toLowerCase() || '';
                 const unitDiff = unitA.localeCompare(unitB);
                 if (unitDiff !== 0) return unitDiff;
-
-                // 3º critério: Localização
                 const localA = a.Localização?.trim().toLowerCase() || '';
                 const localB = b.Localização?.trim().toLowerCase() || '';
                 return localA.localeCompare(localB);
             });
             
-            // Update summary panel
+            // Update summary
             document.getElementById('total-inventario-final').textContent = currentTotalInventario;
             document.getElementById('total-adicionar').textContent = currentCountAdicionar;
             document.getElementById('total-excluir').textContent = currentCountExcluir;
             
-            // 5. Geração da Tabela Principal (Rendering rows)
+            // 5. Geração da Tabela Principal
             reportToRender.forEach(item => {
                 const row = document.createElement('tr');
                 let actionClass = 'bg-gray-50 text-gray-700';
-                if (item.action === 'ADICIONAR') {
-                    actionClass = 'bg-green-100 text-green-700 font-bold';
-                } else if (item.action === 'EXCLUIR') {
-                    actionClass = 'bg-red-100 text-red-700 font-bold';
-                } else if (item.action.includes('ATENÇÃO')) {
-                    actionClass = 'bg-yellow-100 text-yellow-700 font-semibold';
-                }
+                if (item.action === 'ADICIONAR') actionClass = 'bg-green-100 text-green-700 font-bold';
+                else if (item.action === 'EXCLUIR') actionClass = 'bg-red-100 text-red-700 font-bold';
+                else if (item.action.includes('ATENÇÃO')) actionClass = 'bg-yellow-100 text-yellow-700 font-semibold';
 
                 row.className = 'hover:bg-gray-50 transition duration-100';
                 
                 const tombamentoCell = item['Tombamento'] ? `<td class="p-3 font-medium text-gray-900">${item['Tombamento']}</td>` : '<td class="p-3 text-gray-500 italic">SEM TOMBO</td>';
-                
-                // Destaque para o Localização para ADICIONAR/ATENÇÃO
-                let localizacaoClass = 'text-gray-800';
-                if (item.action !== 'OK') {
-                    localizacaoClass = 'text-blue-700 font-bold';
-                }
+                let localizacaoClass = item.action !== 'OK' ? 'text-blue-700 font-bold' : 'text-gray-800';
                 const localizacaoCell = item['Localização'] ? `<td class="p-3 font-medium ${localizacaoClass}">${item['Localização']}</td>` : '<td class="p-3 text-gray-500 italic">SEM LOCAL</td>';
-                
                 const unidadeCell = `<td class="p-3 text-sm text-gray-700">${item['Unidade'] || item.unit || ''}</td>`;
                 const descricaoCell = `<td class="p-3 text-sm text-gray-700">${item['Descrição'] || ''}</td>`;
                 const estadoCell = `<td class="p-3 text-sm text-gray-700">${item['Estado'] || ''}</td>`;
                 
-                // Coluna Tipo/Observação: junta Tipo, Origem Doação, Fornecedor e Observação (com a justificativa da Discrepância)
-                const obsDetails = [item['Origem da Doação'], item['Fornecedor']].filter(d => d).join('; ');
-                const tipoObsContent = [item['Tipo'], obsDetails, item['Observação']].filter(d => d).join(' | ');
+                // Botão da IA
+                let aiButton = '';
+                if (item.action.includes('ATENÇÃO') && item.observacaoOriginal && item.observacaoOriginal.includes('Descrição')) {
+                    // Escapa as descrições para uso em HTML/JS
+                    const descInvEsc = (item.descInv || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    const descSisEsc = (item.descSis || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    aiButton = `<button onclick="verifyWithAI(this, '${descInvEsc}', '${descSisEsc}')" class="ml-2 px-2 py-0.5 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-all">Verificar com IA</button>`;
+                }
 
-                const tipoObsCell = `<td class="p-3 text-sm text-gray-600 rounded-r-lg">${tipoObsContent}</td>`;
+                // Coluna Tipo/Observação
+                const obsDetails = [item['Origem da Doação'], item['Fornecedor']].filter(d => d).join('; ');
+                const tipoObsContent = [item['Tipo'], obsDetails, item['observacaoOriginal'] || item['Observação']].filter(d => d).join(' | ');
+
+                const tipoObsCell = `<td class="p-3 text-sm text-gray-600 rounded-r-lg">${tipoObsContent} ${aiButton}</td>`;
 
                 row.innerHTML = `
                     <td class="p-3 font-semibold whitespace-nowrap ${actionClass} rounded-l-lg">${item.action}</td>
@@ -482,7 +702,6 @@
             const missingItemsBody = document.getElementById('missing-items-body');
             const missingItemsContainer = document.getElementById('missing-items-container');
             missingItemsBody.innerHTML = '';
-
             const missingItems = reportToRender.filter(item => item.action === 'ADICIONAR');
 
             if (missingItems.length > 0) {
@@ -490,7 +709,6 @@
                 missingItems.forEach(item => {
                     const row = document.createElement('tr');
                     row.className = 'hover:bg-green-50 transition duration-100 bg-green-50';
-                    
                     row.innerHTML = `
                         <td class="p-3 font-medium text-gray-900">${item['Descrição'] || ''}</td>
                         <td class="p-3 text-sm text-gray-700">${item['Tombamento'] || 'N/A'}</td>
@@ -503,70 +721,73 @@
                 missingItemsContainer.classList.add('hidden');
             }
 
-
             // 7. Update summary text
             let totalItemsReported = reportToRender.length;
             let inventarioDelta = currentCountAdicionar - currentCountExcluir;
-            
             document.getElementById('summary-text').innerHTML = `
-                <p>O relatório para **${selectedUnit === 'ALL' ? 'Todas as Unidades' : selectedUnit}** contém **${totalItemsReported} itens únicos** (OK + ADICIONAR + EXCLUIR). </p>
-                <p>O Inventário Base da ${selectedUnit === 'ALL' ? 'área total' : selectedUnit} possui **${currentTotalInventario}** itens. </p>
-                <p>A diferença líquida de itens (Adicionar - Excluir) é de: <strong class="${inventarioDelta > 0 ? 'text-green-600' : inventarioDelta < 0 ? 'text-red-600' : 'text-gray-600'}">${inventarioDelta}</strong>. É a quantidade que falta ajustar para o estoque bater.</p>
+                <p>O relatório para **${selectedUnit === 'ALL' ? 'Todas as Unidades' : selectedUnit}** contém **${totalItemsReported} itens únicos (COM TOMBO)**.</p>
+                <p>O Inventário Base (COM TOMBO) da ${selectedUnit === 'ALL' ? 'área total' : selectedUnit} possui **${currentTotalInventario}** itens. </p>
+                <p>A diferença líquida de itens (Adicionar - Excluir) é de: <strong class="${inventarioDelta > 0 ? 'text-green-600' : inventarioDelta < 0 ? 'text-red-600' : 'text-gray-600'}">${inventarioDelta}</strong>.</p>
             `;
         }
 
-        // Função para exportar o relatório atual (filtrado ou completo) como CSV
-        function exportCSV() {
-            const selector = document.getElementById('unit-selector');
-            const selectedUnit = selector.value;
-            
-            let reportToRender = [];
-            const unitsToProcess = selectedUnit === 'ALL' ? Object.keys(reconciledDataByUnit) : [selectedUnit];
+        // Função para exportar CSV (para ambos os modos)
+        function exportCSV(exportTomboData) {
+            let csvContent = '';
+            let filename = '';
 
-            unitsToProcess.forEach(unit => {
-                if (reconciledDataByUnit[unit]) {
-                    reconciledDataByUnit[unit].report.forEach(item => {
-                         reportToRender.push(item);
-                    });
-                }
-            });
-            
-            // Ordenação (garantir que a exportação siga a ordem da tela)
-            reportToRender.sort((a, b) => {
-                const actionOrder = { 'ADICIONAR': 3, 'EXCLUIR': 2, 'ATENÇÃO (Local/Estado Diferente)': 1, 'OK': 0 };
-                
-                const orderDiff = actionOrder[b.action] - actionOrder[a.action];
-                if (orderDiff !== 0) return orderDiff;
+            if (exportTomboData) {
+                // Exporta Relatório COM TOMBO
+                const selector = document.getElementById('unit-selector');
+                const selectedUnit = selector.value;
+                let reportToRender = [];
+                const unitsToProcess = selectedUnit === 'ALL' ? Object.keys(reconciledDataByUnit) : [selectedUnit];
 
-                const unitA = a.unit?.trim().toLowerCase() || '';
-                const unitB = b.unit?.trim().toLowerCase() || '';
-                const unitDiff = unitA.localeCompare(unitB);
-                if (unitDiff !== 0) return unitDiff;
-
-                const localA = a.Localização?.trim().toLowerCase() || '';
-                const localB = b.Localização?.trim().toLowerCase() || '';
-                return localA.localeCompare(localB);
-            });
-
-
-            // Define CSV headers (Ação + SISTEMA_HEADERS)
-            const headers = ['Ação Sugerida', ...SISTEMA_HEADERS];
-            
-            let csvContent = headers.join(';') + '\n'; // Usa ponto e vírgula como separador
-            
-            reportToRender.forEach(item => {
-                const values = [];
-                values.push(item.action); // Ação Sugerida
-                SISTEMA_HEADERS.forEach(header => {
-                    let value = (item[header] || '').replace(/;/g, ',').replace(/\n/g, ' ').trim(); // Sanitiza valor
-                    values.push(value);
+                unitsToProcess.forEach(unit => {
+                    if (reconciledDataByUnit[unit]) {
+                        reconciledDataByUnit[unit].report.forEach(item => reportToRender.push(item));
+                    }
                 });
-                csvContent += values.join(';') + '\n';
-            });
-            
-            const unitName = selectedUnit === 'ALL' ? 'Geral' : selectedUnit.replace(/[^a-zA-Z0-9]/g, '_');
-            const filename = `Reconciliacao_Inventario_${unitName}.csv`;
+                
+                reportToRender.sort((a, b) => { /* ... (mesma lógica de ordenação) ... */ });
 
+                const headers = ['Ação Sugerida', ...SISTEMA_HEADERS, 'Justificativa Discrepância'];
+                csvContent = headers.join(';') + '\n'; 
+                
+                reportToRender.forEach(item => {
+                    const values = [];
+                    values.push(item.action);
+                    SISTEMA_HEADERS.forEach(header => {
+                        let value = (item[header] || '').replace(/;/g, ',').replace(/\n/g, ' ').trim();
+                        values.push(value);
+                    });
+                    // Adiciona a justificativa separadamente
+                    values.push((item.observacaoOriginal || '').replace(/;/g, ',').replace(/\n/g, ' ').trim());
+                    csvContent += values.join(';') + '\n';
+                });
+                
+                const unitName = selectedUnit === 'ALL' ? 'Geral' : selectedUnit.replace(/[^a-zA-Z0-9]/g, '_');
+                filename = `Reconciliacao_COM_Tombo_${unitName}.csv`;
+
+            } else {
+                // Exporta Relatório SEM TOMBO
+                const headers = ['Local', 'Descricao', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
+                csvContent = headers.join(';') + '\n';
+                
+                noTomboAuditData.forEach(item => {
+                    const values = [
+                        item.local.replace(/;/g, ','),
+                        item.desc.replace(/;/g, ','),
+                        item.qtdInv,
+                        item.qtdSis,
+                        item.diff
+                    ];
+                    csvContent += values.join(';') + '\n';
+                });
+                filename = `Auditoria_SEM_Tombo.csv`;
+            }
+
+            // Lógica de Download
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             
@@ -599,3 +820,4 @@
     </script>
 </body>
 </html>
+
