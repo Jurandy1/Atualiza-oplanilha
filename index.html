@@ -44,7 +44,7 @@
 
     <div class="max-w-6xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
         <h1 class="text-3xl font-extrabold text-gray-800 mb-2 border-b-4 border-primary pb-2 flex items-center">
-            Sistema de Reconciliação de Inventário (por CRAS/Unidade) 📊
+            Sistema de Reconciliação de Inventário (Consolidado) 📊
         </h1>
         <p class="text-gray-600 mb-6">
             Cole os dados diretamente das suas planilhas (Tab-Separated/TSV ou CSV) para conciliar o estoque. O sistema usará o **Tombo/Tombamento** como chave e agrupará por **Unidade** (CRAS).
@@ -98,7 +98,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
                 <div class="p-4 rounded-lg bg-blue-100 shadow-md">
                     <p class="text-3xl font-bold text-blue-700" id="total-inventario-final">0</p>
-                    <p class="text-sm text-blue-600">Total Inventário (Base da Unidade)</p>
+                    <p class="text-sm text-blue-600">Total Inventário (Base)</p>
                 </div>
                 <div class="p-4 rounded-lg bg-green-100 shadow-md">
                     <p class="text-3xl font-bold text-green-700" id="total-adicionar">0</p>
@@ -110,13 +110,42 @@
                 </div>
             </div>
 
+            <!-- NOVO BLOCO: ITENS FALTANDO (ADICIONAR) -->
+            <div id="missing-items-container" class="mt-8 hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b-2 border-green-500 pb-1 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+                    </svg>
+                    Itens Faltando no Sistema (Para ADICIONAR) 🟢
+                </h3>
+                <p class="text-sm text-gray-600 mb-2">Estes itens estão no Inventário Base, mas não foram encontrados no Sistema. Eles devem ser adicionados ao estoque, no local listado do Inventário (Lista 1).</p>
+                <div class="overflow-x-auto rounded-lg shadow-xl">
+                    <table class="min-w-full bg-white responsive-table">
+                        <thead class="bg-green-100 border-b-2 border-green-300 sticky top-0">
+                            <tr>
+                                <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Item (Descrição)</th>
+                                <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tombo</th>
+                                <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Local Exato (Inventário)</th>
+                                <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Unidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="missing-items-body" class="divide-y divide-gray-200">
+                            <!-- Itens faltantes serão injetados aqui -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- FIM DO NOVO BLOCO -->
+
+
             <!-- Export Button -->
-            <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-violet-700 transition duration-300 transform hover:scale-[1.01] mb-4">
+            <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-violet-700 transition duration-300 transform hover:scale-[1.01] mb-4 mt-8">
                 Exportar Relatório CSV (Unidade Selecionada)
             </button>
             
-            <!-- Tabela de Resultados -->
+            <!-- Tabela Principal de Resultados (Completa) -->
             <div class="overflow-x-auto rounded-lg shadow-xl table-container">
+                <h3 class="text-lg font-bold text-gray-700 mb-2">Tabela de Reconciliação Detalhada (Todos os Itens)</h3>
                 <table class="min-w-full bg-white responsive-table">
                     <thead class="bg-gray-200 border-b-2 border-gray-300 sticky top-0">
                         <tr>
@@ -272,8 +301,16 @@
                     sourceData = itemSis; // Usa dados do Sistema como base
                     if (localInv !== localSis || estadoInv !== estadoSis) {
                         action = 'ATENÇÃO (Local/Estado Diferente)';
-                        // Adiciona Observação para clareza
-                        sourceData['Observação'] = sourceData['Observação'] ? `${sourceData['Observação']} | INV: Local="${itemInv['Local'] || ''}", Estado="${itemInv['Estado de Conservação'] || ''}"` : `INV: Local="${itemInv['Local'] || ''}", Estado="${itemInv['Estado de Conservação'] || ''}"`;
+                        // ADICIONA A JUSTIFICATIVA COMPLETA (O PORQUÊ DA ATENÇÃO)
+                        const invLocal = itemInv['Local'] || 'Não Informado';
+                        const invEstado = itemInv['Estado de Conservação'] || 'Não Informado';
+                        
+                        sourceData['Observação'] = sourceData['Observação'] ? 
+                            `${sourceData['Observação']} | DISCREPÂNCIA: Inv Local="${invLocal}", Inv Estado="${invEstado}"` : 
+                            `DISCREPÂNCIA: Inv Local="${invLocal}", Inv Estado="${invEstado}"`;
+                        
+                        // Garante que a localização do sistema é usada, mas o item é marcado
+                        sourceData['Localização'] = itemSis['Localização'] || invLocal; // Prioriza o local do sistema
                     }
 
                 } else if (itemInv && !itemSis) {
@@ -291,6 +328,8 @@
                         if (!sourceData[h]) sourceData[h] = '';
                     });
                     sourceData['Tipo'] = 'NOVO ITEM'; 
+                    // Garante que a localização do inventário seja usada, é a informação crucial
+                    sourceData['Localização'] = itemInv['Local'] || ''; 
                     sourceData['Observação'] = `Ação: ADICIONAR. Baseado em Inventário. Local: ${itemInv['Local'] || ''}`;
 
                 } else if (!itemInv && itemSis) {
@@ -344,7 +383,7 @@
             `;
             filterContainer.innerHTML = selectHtml;
             
-            // Renderiza o relatório completo inicialmente
+            // Renderiza o relatório completo (ALL) inicialmente, como o usuário solicitou
             renderReport('ALL');
         }
 
@@ -394,7 +433,7 @@
             document.getElementById('total-adicionar').textContent = currentCountAdicionar;
             document.getElementById('total-excluir').textContent = currentCountExcluir;
             
-            // 5. Geração da Tabela (Rendering rows)
+            // 5. Geração da Tabela Principal (Rendering rows)
             reportToRender.forEach(item => {
                 const row = document.createElement('tr');
                 let actionClass = 'bg-gray-50 text-gray-700';
@@ -409,12 +448,19 @@
                 row.className = 'hover:bg-gray-50 transition duration-100';
                 
                 const tombamentoCell = item['Tombamento'] ? `<td class="p-3 font-medium text-gray-900">${item['Tombamento']}</td>` : '<td class="p-3 text-gray-500 italic">SEM TOMBO</td>';
-                const localizacaoCell = item['Localização'] ? `<td class="p-3 font-medium text-gray-800">${item['Localização']}</td>` : '<td class="p-3 text-gray-500 italic">SEM LOCAL</td>';
+                
+                // Destaque para o Localização para ADICIONAR/ATENÇÃO
+                let localizacaoClass = 'text-gray-800';
+                if (item.action !== 'OK') {
+                    localizacaoClass = 'text-blue-700 font-bold';
+                }
+                const localizacaoCell = item['Localização'] ? `<td class="p-3 font-medium ${localizacaoClass}">${item['Localização']}</td>` : '<td class="p-3 text-gray-500 italic">SEM LOCAL</td>';
+                
                 const unidadeCell = `<td class="p-3 text-sm text-gray-700">${item['Unidade'] || item.unit || ''}</td>`;
                 const descricaoCell = `<td class="p-3 text-sm text-gray-700">${item['Descrição'] || ''}</td>`;
                 const estadoCell = `<td class="p-3 text-sm text-gray-700">${item['Estado'] || ''}</td>`;
                 
-                // Coluna Tipo/Observação: junta Tipo, Origem Doação, Fornecedor e Observação
+                // Coluna Tipo/Observação: junta Tipo, Origem Doação, Fornecedor e Observação (com a justificativa da Discrepância)
                 const obsDetails = [item['Origem da Doação'], item['Fornecedor']].filter(d => d).join('; ');
                 const tipoObsContent = [item['Tipo'], obsDetails, item['Observação']].filter(d => d).join(' | ');
 
@@ -431,8 +477,34 @@
                 `;
                 resultsBody.appendChild(row);
             });
-            
-            // Update summary text
+
+            // 6. Geração da Tabela de Itens Faltantes (ADICIONAR)
+            const missingItemsBody = document.getElementById('missing-items-body');
+            const missingItemsContainer = document.getElementById('missing-items-container');
+            missingItemsBody.innerHTML = '';
+
+            const missingItems = reportToRender.filter(item => item.action === 'ADICIONAR');
+
+            if (missingItems.length > 0) {
+                missingItemsContainer.classList.remove('hidden');
+                missingItems.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-green-50 transition duration-100 bg-green-50';
+                    
+                    row.innerHTML = `
+                        <td class="p-3 font-medium text-gray-900">${item['Descrição'] || ''}</td>
+                        <td class="p-3 text-sm text-gray-700">${item['Tombamento'] || 'N/A'}</td>
+                        <td class="p-3 text-sm text-gray-700 font-semibold text-green-700">${item['Localização'] || 'Não Informado'}</td>
+                        <td class="p-3 text-sm text-gray-700">${item['Unidade'] || item.unit || 'N/A'}</td>
+                    `;
+                    missingItemsBody.appendChild(row);
+                });
+            } else {
+                missingItemsContainer.classList.add('hidden');
+            }
+
+
+            // 7. Update summary text
             let totalItemsReported = reportToRender.length;
             let inventarioDelta = currentCountAdicionar - currentCountExcluir;
             
