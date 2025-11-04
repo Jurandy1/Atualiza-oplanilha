@@ -306,16 +306,33 @@
         // --- FIM: Lógica da API Gemini ---
 
 
-        // Função de normalização simples para strings (remove acentos, minúsculas, espaços extras)
+        // Função de normalização MELHORADA para strings (resolve "12 mil" vs "12.000")
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
-            return str
-                .toLowerCase()
-                .normalize("NFD") // Remove acentos
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/\s+/g, ' ') // Remove espaços extras
-                .replace(/-+/g, ' ') // remove traços
-                .trim();
+            let s = str.toLowerCase();
+            
+            // 1. Remove acentos
+            s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            // 2. Padroniza "mil" para "000" (Ex: "12 mil btus" -> "12000 btus")
+            // \b = boundary (palavra inteira), (\d+) = captura números, \s* = espaços, mil
+            s = s.replace(/\b(\d+)\s*mil\b/g, '$1000'); 
+            
+            // 3. Remove pontuação de números (Ex: "12.000" -> "12000")
+            // Remove . ou , que estejam entre digitos
+            s = s.replace(/(\d+)[.,](\d+)/g, '$1$2'); 
+            
+            // 4. Padroniza unidades (Ex: "btus", "btu/h" -> "btu")
+            s = s.replace(/\bbtus\b/g, 'btu');
+            s = s.replace(/\bbtu\/h\b/g, 'btu');
+            
+            // 5. Remove caracteres especiais (incluindo os que o usuário mostrou: / .)
+            s = s.replace(/[-/.,]/g, ' '); 
+            
+            // 6. Remove espaços extras
+            s = s.replace(/\s+/g, ' ').trim(); 
+            
+            return s;
         }
         
         // Verifica se um item tem tombo (considerando S/T, 0, etc.)
@@ -848,6 +865,7 @@
     </script>
 </body>
 </html>
+
 
 
 
