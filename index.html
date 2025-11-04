@@ -78,6 +78,18 @@
             </div>
         </div>
 
+        <!-- NOVO: FILTRO DE UNIDADE -->
+        <div id="filter-container" class="mb-6 hidden">
+            <label for="unit-filter" class="block text-lg font-semibold text-gray-700 mb-2">
+                Selecione a Unidade (CRAS) para Analisar:
+            </label>
+            <select id="unit-filter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-150 bg-white">
+                <option value="all">-- Todas as Unidades --</option>
+                <!-- Opções de unidade serão preenchidas dinamicamente -->
+            </select>
+        </div>
+
+
         <!-- BOTÃO DE AÇÃO ÚNICO -->
         <div class="mb-8">
              <button onclick="runMasterCount()" class="w-full px-6 py-3 bg-primary text-white font-bold text-lg rounded-xl shadow-lg hover:bg-primary-dark transition duration-300 transform hover:scale-[1.01]">
@@ -88,10 +100,10 @@
         
         <!-- Container de Resultados - Auditoria de Quantidade -->
         <div id="results-container" class="mt-12 hidden">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-primary pb-2">
+            <h2 id="report-title" class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-primary pb-2">
                 Relatório de Auditoria de Quantidade
             </h2>
-            <p class="text-gray-600 mb-4">
+            <p id="report-subtitle" class="text-gray-600 mb-4">
                 Este relatório agrupa **todos** os itens (com ou sem tombo) por Local e Descrição para encontrar discrepâncias de quantidade.
             </p>
             
@@ -99,6 +111,22 @@
             <button onclick="exportCSV()" class="w-full md:w-auto px-6 py-2 bg-export text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-300 transform hover:scale-[1.01] mb-4">
                 Exportar Auditoria CSV
             </button>
+            
+            <!-- NOVO: Resumo de Totais -->
+            <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-blue-600" id="summary-inv">0</div>
+                    <div class="text-sm font-semibold text-gray-600">Total Itens (Inventário)</div>
+                </div>
+                 <div class="p-4 bg-orange-50 border border-orange-200 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-orange-600" id="summary-sis">0</div>
+                    <div class="text-sm font-semibold text-gray-600">Total Itens (Sistema)</div>
+                </div>
+                 <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-gray-700" id="summary-diff">0</div>
+                    <div class="text-sm font-semibold text-gray-600">Diferença Líquida (Inv - Sis)</div>
+                </div>
+            </div>
 
             <div class="overflow-x-auto rounded-lg shadow-xl table-container mt-4">
                 <table class="min-w-full bg-white responsive-table">
@@ -124,7 +152,9 @@
     <script>
         // Global variable for storing audit data
         let auditData = []; // Para a auditoria de quantidade
-
+        let globalInventarioData = [];
+        let globalSistemaData = [];
+        let uniqueUnits = new Set();
         
         // Função de normalização MELHORADA para strings (resolve "12 mil" vs "12.000")
         function normalizeString(str) {
@@ -195,24 +225,61 @@
             return data;
         }
 
-        
-        // --- FLUXO ÚNICO: Auditoria de Quantidade Mestra ---
-        function runMasterCount() {
-            const listInventarioText = document.getElementById('list-inventario').value;
-            const listSistemaText = document.getElementById('list-sistema').value;
+        // NOVO: Função para atualizar o filtro de unidades
+        function updateUnitFilter() {
+            uniqueUnits = new Set();
+            const filterSelect = document.getElementById('unit-filter');
+            const filterContainer = document.getElementById('filter-container');
+
+            // Encontra o nome da coluna "Unidade" em ambas as listas
+            const invHeader = (parseData(document.getElementById('list-inventario').value)[0] || {});
+            const invUnitCol = Object.keys(invHeader).find(k => normalizeString(k) === 'unidade');
             
+            const sisHeader = (parseData(document.getElementById('list-sistema').value)[0] || {});
+            const sisUnitCol = Object.keys(sisHeader).find(k => normalizeString(k) === 'unidade');
+            
+            globalInventarioData.forEach(item => {
+                if(invUnitCol) uniqueUnits.add(normalizeString(item[invUnitCol] || ''));
+            });
+            globalSistemaData.forEach(item => {
+                if(sisUnitCol) uniqueUnits.add(normalizeString(item[sisUnitCol] || ''));
+            });
+
+            // Limpa unidades vazias
+            uniqueUnits.delete('');
+            uniqueUnits.delete('sem unidade');
+
+            // Limpa opções antigas (mantendo a primeira)
+            while (filterSelect.options.length > 1) {
+                filterSelect.remove(1);
+            }
+            
+            const sortedUnits = [...uniqueUnits].sort();
+            sortedUnits.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit;
+                option.textContent = unit.toUpperCase(); // Mostra em maiúsculo para ficar mais claro
+                filterSelect.appendChild(option);
+            });
+            
+            if (sortedUnits.length > 0) {
+                filterContainer.classList.remove('hidden');
+            } else {
+                filterContainer.classList.add('hidden');
+            }
+        }
+        
+        // --- FLUXO ÚNICO: Auditoria de Quantidade Mestra (Agora com filtro) ---
+        function runMasterCount() {
             document.getElementById('results-container').classList.add('hidden');
             
-            if (!listInventarioText.trim() && !listSistemaText.trim()) {
-                console.error('Por favor, cole os dados do Inventário e do Sistema.');
+            if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
+                console.error('Dados não foram carregados.');
                 return;
             }
 
-            const inventarioData = parseData(listInventarioText);
-            const sistemaData = parseData(listSistemaText);
-            
-            document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${inventarioData.length}`;
-            document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${sistemaData.length}`;
+            // NOVO: Pega a unidade selecionada no filtro
+            const selectedUnit = document.getElementById('unit-filter').value;
 
             // Mostra o container de resultados
             document.getElementById('results-container').classList.remove('hidden');
@@ -221,13 +288,19 @@
             const sistemaMap = new Map();
             const allCompositeKeys = new Set();
             auditData = []; // Limpa auditoria anterior
+            
+            let totalInv = 0;
+            let totalSis = 0;
 
             // Processa Inventário (USA: Unidade, Local, Item)
-            inventarioData.forEach(item => {
-                // Aplica a normalização aos cabeçalhos esperados
+            globalInventarioData.forEach(item => {
                 const unidade = normalizeString(item['Unidade'] || 'Sem Unidade');
+                
+                // NOVO: Pula o item se não for da unidade selecionada (e não for 'all')
+                if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
+                
                 const local = normalizeString(item['Local'] || 'Sem Local');
-                const desc = normalizeString(item['Item'] || 'Sem Descrição'); // Do Inventário
+                const desc = normalizeString(item['Item'] || 'Sem Descrição');
                 const compositeKey = `${unidade}|${local}|${desc}`;
                 
                 allCompositeKeys.add(compositeKey);
@@ -235,10 +308,14 @@
             });
             
             // Processa Sistema (USA: Unidade, Localização, Descrição)
-            sistemaData.forEach(item => {
+            globalSistemaData.forEach(item => {
                 const unidade = normalizeString(item['Unidade'] || 'Sem Unidade');
-                const local = normalizeString(item['Localização'] || 'Sem Local'); // Do Sistema
-                const desc = normalizeString(item['Descrição'] || 'Sem Descrição'); // Do Sistema
+                
+                // NOVO: Pula o item se não for da unidade selecionada (e não for 'all')
+                if (selectedUnit !== 'all' && unidade !== selectedUnit) return;
+
+                const local = normalizeString(item['Localização'] || 'Sem Local');
+                const desc = normalizeString(item['Descrição'] || 'Sem Descrição');
                 const compositeKey = `${unidade}|${local}|${desc}`;
 
                 allCompositeKeys.add(compositeKey);
@@ -252,13 +329,17 @@
             const sortedKeys = [...allCompositeKeys].sort();
 
             for (const compositeKey of sortedKeys) {
-                // Ignora chaves "vazias" (ex: "sem unidade|sem local|sem descrição")
+                // Ignora chaves "vazias"
                 if (compositeKey === "sem unidade|sem local|sem descrição") continue;
                 
                 const [unidade, local, desc] = compositeKey.split('|');
                 const qtdInv = inventarioMap.get(compositeKey) || 0;
                 const qtdSis = sistemaMap.get(compositeKey) || 0;
                 const diff = qtdInv - qtdSis;
+
+                // Atualiza totais do resumo
+                totalInv += qtdInv;
+                totalSis += qtdSis;
 
                 if (qtdInv > 0 || qtdSis > 0) { // Só mostra se houver item em pelo menos uma lista
                     const auditRow = {
@@ -294,13 +375,24 @@
                     resultsBody.appendChild(row);
                 }
             }
+            
+            // NOVO: Atualiza Títulos e Resumo
+            const unitText = selectedUnit === 'all' ? 'Geral (Todas as Unidades)' : selectedUnit.toUpperCase();
+            document.getElementById('report-title').textContent = `Relatório de Auditoria: ${unitText}`;
+            document.getElementById('report-subtitle').textContent = `Comparação de quantidade de itens para ${selectedUnit === 'all' ? 'todas as unidades' : 'a unidade ' + unitText}.`;
+            
+            document.getElementById('summary-inv').textContent = totalInv;
+            document.getElementById('summary-sis').textContent = totalSis;
+            const totalDiff = totalInv - totalSis;
+            document.getElementById('summary-diff').textContent = `${totalDiff > 0 ? '+' : ''}${totalDiff}`;
         }
 
 
         // Função para exportar CSV (modo único de auditoria)
         function exportCSV() {
             let csvContent = '';
-            let filename = '';
+            const selectedUnit = document.getElementById('unit-filter').value;
+            let filename = `Auditoria_de_Quantidade_${selectedUnit === 'all' ? 'Geral' : selectedUnit}.csv`;
 
             // Exporta Relatório SEM TOMBO
             const headers = ['Unidade', 'Local', 'Descricao', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca'];
@@ -317,7 +409,6 @@
                 ];
                 csvContent += values.join(';') + '\n';
             });
-            filename = `Auditoria_de_Quantidade.csv`;
 
             // Lógica de Download
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -336,18 +427,25 @@
             }
         }
 
-        // Adiciona listener para atualizar a contagem enquanto digita/cola
-        function setupCountListeners() {
-            document.getElementById('list-inventario').addEventListener('input', () => {
-                 const data = parseData(document.getElementById('list-inventario').value);
-                 document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${data.length}`;
-            });
-            document.getElementById('list-sistema').addEventListener('input', () => {
-                 const data = parseData(document.getElementById('list-sistema').value);
-                 document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${data.length}`;
-            });
+        // Adiciona listener para atualizar a contagem E o filtro de unidade
+        function setupDataListeners() {
+            const inventarioTextarea = document.getElementById('list-inventario');
+            const sistemaTextarea = document.getElementById('list-sistema');
+            
+            const handleInput = () => {
+                 globalInventarioData = parseData(inventarioTextarea.value);
+                 globalSistemaData = parseData(sistemaTextarea.value);
+                 
+                 document.getElementById('count-inventario').textContent = `Total de Itens no Inventário: ${globalInventarioData.length}`;
+                 document.getElementById('count-sistema').textContent = `Total de Itens no Sistema: ${globalSistemaData.length}`;
+                 
+                 updateUnitFilter(); // Atualiza o filtro de unidade
+            };
+            
+            inventarioTextarea.addEventListener('input', handleInput);
+            sistemaTextarea.addEventListener('input', handleInput);
         }
-        window.onload = setupCountListeners;
+        window.onload = setupDataListeners;
 
     </script>
 </body>
