@@ -172,11 +172,11 @@
                             <!-- Cabeçalho do Sistema + Ação -->
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ação Sugerida</th>
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tombamento</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Localização</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Localização (Sis vs Inv)</th>
                             <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Unidade</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Item)</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Estado</th>
-                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo/Observação (e Verificação IA)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descrição (Sis vs Inv)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Estado (Sis vs Inv)</th>
+                            <th class="p-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Critério/Observação (e Verificação IA)</th>
                         </tr>
                     </thead>
                     <tbody id="results-body" class="divide-y divide-gray-200">
@@ -442,6 +442,11 @@
                 if (itemInv && itemSis) {
                     sourceData = itemSis;
                     
+                    // (Req 3) Salva os dados do Inventário (Lista 1) para comparação lado-a-lado
+                    sourceData['invLocal'] = itemInv['Local'] || '';
+                    sourceData['invEstado'] = itemInv['Estado de Conservação'] || '';
+                    sourceData['invDesc'] = itemInv['Item'] || '';
+
                     const localInv = normalizeString(itemInv['Local']);
                     const localSis = normalizeString(itemSis['Localização']);
                     const estadoInv = normalizeString(itemInv['Estado de Conservação']);
@@ -465,7 +470,7 @@
                     if (discrepancies.length > 0) {
                         action = 'ATENÇÃO (Discrepância)';
                         const justification = `DISCREPÂNCIA: ${discrepancies.join(' | ')}`;
-                        sourceData['observacaoOriginal'] = justification;
+                        sourceData['observacaoOriginal'] = justification; // (Req 2) Texto de critério
                         sourceData['descInv'] = itemInv['Item'] || ''; // Salva para o botão da IA
                         sourceData['descSis'] = itemSis['Descrição'] || ''; // Salva para o botão da IA
                     }
@@ -481,14 +486,16 @@
                     SISTEMA_HEADERS.forEach(h => { if (!sourceData[h]) sourceData[h] = ''; });
                     sourceData['Tipo'] = 'NOVO ITEM'; 
                     sourceData['Localização'] = itemInv['Local'] || ''; 
-                    sourceData['Observação'] = `Ação: ADICIONAR. Baseado em Inventário. Local: ${itemInv['Local'] || ''}`;
+                    // (Req 2) Texto de critério explícito
+                    sourceData['observacaoOriginal'] = "Item encontrado no Inventário (Lista 1) mas não consta no Sistema (Lista 2).";
                     sourceData['Tombamento'] = itemInv['Tombo'] || '';
 
                 } else if (!itemInv && itemSis) {
                     action = 'EXCLUIR';
                     reconciledDataByUnit[unit].countExcluir++;
                     sourceData = itemSis;
-                    sourceData['Observação'] = sourceData['Observação'] ? `[EXCLUIR] ${sourceData['Observação']}` : '[EXCLUIR] Item não encontrado no Inventário Base.';
+                    // (Req 2) Texto de critério explícito
+                    sourceData['observacaoOriginal'] = "Item consta no Sistema (Lista 2) mas não foi encontrado no Inventário (Lista 1).";
                 }
 
                 reconciledDataByUnit[unit].report.push({
@@ -665,11 +672,31 @@
                 row.className = 'hover:bg-gray-50 transition duration-100';
                 
                 const tombamentoCell = item['Tombamento'] ? `<td class="p-3 font-medium text-gray-900">${item['Tombamento']}</td>` : '<td class="p-3 text-gray-500 italic">SEM TOMBO</td>';
-                let localizacaoClass = item.action !== 'OK' ? 'text-blue-700 font-bold' : 'text-gray-800';
-                const localizacaoCell = item['Localização'] ? `<td class="p-3 font-medium ${localizacaoClass}">${item['Localização']}</td>` : '<td class="p-3 text-gray-500 italic">SEM LOCAL</td>';
+                
+                // (Req 1) Esta célula é preenchida mesmo no modo "ALL"
                 const unidadeCell = `<td class="p-3 text-sm text-gray-700">${item['Unidade'] || item.unit || ''}</td>`;
-                const descricaoCell = `<td class="p-3 text-sm text-gray-700">${item['Descrição'] || ''}</td>`;
-                const estadoCell = `<td class="p-3 text-sm text-gray-700">${item['Estado'] || ''}</td>`;
+                
+                // (Req 3) Comparação Lado-a-Lado para Localização
+                let localizacaoHtml = item['Localização'] ? item['Localização'] : '<i class="text-gray-500">SEM LOCAL</i>';
+                if (item.action.includes('ATENÇÃO') && item['invLocal'] !== undefined && normalizeString(item['Localização']) !== normalizeString(item['invLocal'])) {
+                    localizacaoHtml = `<div class='text-xs'><span class='font-bold text-red-700'>[Sis]:</span> ${item['Localização']}</div><div class='text-xs'><span class='font-bold text-blue-700'>[Inv]:</span> ${item['invLocal']}</div>`;
+                }
+                const localizacaoCell = `<td class="p-3 font-medium">${localizacaoHtml}</td>`;
+
+                // (Req 3) Comparação Lado-a-Lado para Descrição
+                let descricaoHtml = item['Descrição'] || '';
+                if (item.action.includes('ATENÇÃO') && item['invDesc'] !== undefined && normalizeString(item['Descrição']) !== normalizeString(item['invDesc'])) {
+                    descricaoHtml = `<div class='text-xs'><span class='font-bold text-red-700'>[Sis]:</span> ${item['Descrição']}</div><div class='text-xs'><span class='font-bold text-blue-700'>[Inv]:</span> ${item['invDesc']}</div>`;
+                }
+                const descricaoCell = `<td class="p-3 text-sm text-gray-700">${descricaoHtml}</td>`;
+
+                // (Req 3) Comparação Lado-a-Lado para Estado
+                let estadoHtml = item['Estado'] || '';
+                if (item.action.includes('ATENÇÃO') && item['invEstado'] !== undefined && normalizeString(item['Estado']) !== normalizeString(item['invEstado'])) {
+                    estadoHtml = `<div class='text-xs'><span class='font-bold text-red-700'>[Sis]:</span> ${item['Estado']}</div><div class='text-xs'><span class='font-bold text-blue-700'>[Inv]:</span> ${item['invEstado']}</div>`;
+                }
+                const estadoCell = `<td class="p-3 text-sm text-gray-700">${estadoHtml}</td>`;
+
                 
                 // Botão da IA
                 let aiButton = '';
@@ -680,8 +707,9 @@
                     aiButton = `<button onclick="verifyWithAI(this, '${descInvEsc}', '${descSisEsc}')" class="ml-2 px-2 py-0.5 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-all">Verificar com IA</button>`;
                 }
 
-                // Coluna Tipo/Observação
+                // (Req 2) Coluna Tipo/Observação/Critério
                 const obsDetails = [item['Origem da Doação'], item['Fornecedor']].filter(d => d).join('; ');
+                // Usa a 'observacaoOriginal' (com critério claro) ou a 'Observação' padrão
                 const tipoObsContent = [item['Tipo'], obsDetails, item['observacaoOriginal'] || item['Observação']].filter(d => d).join(' | ');
 
                 const tipoObsCell = `<td class="p-3 text-sm text-gray-600 rounded-r-lg">${tipoObsContent} ${aiButton}</td>`;
@@ -726,7 +754,7 @@
             let inventarioDelta = currentCountAdicionar - currentCountExcluir;
             document.getElementById('summary-text').innerHTML = `
                 <p>O relatório para **${selectedUnit === 'ALL' ? 'Todas as Unidades' : selectedUnit}** contém **${totalItemsReported} itens únicos (COM TOMBO)**.</p>
-                <p>O Inventário Base (COM TOMBO) da ${selectedUnit === 'ALL' ? 'área total' : selectedUnit} possui **${currentTotalInventario}** itens. </p>
+                <p>O Inventário Base (COM TOMBO) da ${selectedUnit === 'ALL' ? 'área total' : selectedCras} possui **${currentTotalInventario}** itens. </p>
                 <p>A diferença líquida de itens (Adicionar - Excluir) é de: <strong class="${inventarioDelta > 0 ? 'text-green-600' : inventarioDelta < 0 ? 'text-red-600' : 'text-gray-600'}">${inventarioDelta}</strong>.</p>
             `;
         }
@@ -751,7 +779,7 @@
                 
                 reportToRender.sort((a, b) => { /* ... (mesma lógica de ordenação) ... */ });
 
-                const headers = ['Ação Sugerida', ...SISTEMA_HEADERS, 'Justificativa Discrepância'];
+                const headers = ['Ação Sugerida', ...SISTEMA_HEADERS, 'Critério/Justificativa'];
                 csvContent = headers.join(';') + '\n'; 
                 
                 reportToRender.forEach(item => {
