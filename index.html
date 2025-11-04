@@ -1544,12 +1544,18 @@
                     if (linkedSysName) {
                         // Item vinculado
                         divergenceClass = 'item-linked';
+                        // *** MUDANÇA: Se está vinculado, a divergência de quantidade não é mostrada aqui. ***
+                        // O relatório final cuidará disso.
+                        divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} ✓</span>`;
+                        
+                        /* Lógica antiga removida
                         const sisQty = sisQtyMap.get(linkedSysName) || 0;
                         if (invQty === sisQty) {
                             divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} ✓ (Qtd: ${invQty})</span>`;
                         } else {
                             divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${linkedSysName} (Qtd: ${invQty} vs ${sisQty})</span>`;
                         }
+                        */
                     } else if (!sisQtyMap.has(itemName)) {
                         divergenceClass = 'item-only-inv';
                         divergenceBadge = `<span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">⚠️ Só Inventário (Qtd: ${invQty})</span>`;
@@ -1601,12 +1607,18 @@
                         locationLinks.forEach((sysN, invN) => {
                             if (sysN === itemName) invName = invN;
                         });
+                        
+                        // *** MUDANÇA: Se está vinculado, a divergência de quantidade não é mostrada aqui. ***
+                        divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} ✓</span>`;
+                        
+                        /* Lógica antiga removida
                         const invQty = invQtyMap.get(invName) || 0;
                         if (sisQty === invQty) {
                             divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} ✓ (Qtd: ${sisQty})</span>`;
                         } else {
                             divergenceBadge = `<span class="link-badge">🔗 Vinculado a: ${invName} (Qtd: ${sisQty} vs ${invQty})</span>`;
                         }
+                        */
                     } else if (!invQtyMap.has(itemName)) {
                         divergenceClass = 'item-only-sys';
                         divergenceBadge = `<span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">⚠️ Só Sistema (Qtd: ${sisQty})</span>`;
