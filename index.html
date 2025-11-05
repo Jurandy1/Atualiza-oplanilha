@@ -259,6 +259,19 @@
         .report-table tr:hover {
             background: #f9fafb;
         }
+
+        /* Novo estilo para Local Linking */
+        .location-link-mode {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+            border: 2px dashed #3b82f6 !important;
+        }
+
+        .location-selected {
+            background: #dbeafe !important;
+            border: 3px solid #3b82f6 !important;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            transform: scale(1.02);
+        }
     </style>
     <script>
         tailwind.config = {
@@ -299,7 +312,7 @@
                 Analisador com Vinculação Inteligente
             </h1>
             <p class="text-gray-600 text-lg">
-                Sistema avançado que permite vincular itens com nomes diferentes
+                Sistema avançado que permite vincular itens e locais com nomes diferentes
             </p>
             <div class="mt-3 flex flex-wrap gap-2">
                 <span class="status-badge bg-green-100 text-green-700">✓ Comparação Automática</span>
@@ -317,10 +330,10 @@
                         <span class="text-2xl">🔗</span>
                         <span>Gerenciador de Vinculações</span>
                     </h3>
-                    <p class="text-sm text-purple-600 mt-1">Vincule itens com nomes diferentes que são a mesma coisa</p>
+                    <p class="text-sm text-purple-600 mt-1">Vincule locais e itens com nomes diferentes</p>
                 </div>
                 <button onclick="toggleLinkManager()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition">
-                    Ver Vinculações (<span id="link-count">0</span>)
+                    Ver Vínculos (<span id="link-count">0</span>)
                 </button>
             </div>
             <div class="flex gap-3">
@@ -461,6 +474,15 @@
             
             <!-- Botões de Ação -->
             <div class="flex flex-wrap gap-3 mb-6">
+                 <!-- REQ 1: Novo botão para Vinculação de Local -->
+                <button 
+                    onclick="toggleLocalLinkingMode()" 
+                    id="local-link-mode-btn" 
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
+                >
+                    <span class="text-xl">🗺️</span>
+                    <span>Ativar Vínculo de Local</span>
+                </button>
                 <button 
                     onclick="generateFinalReport()" 
                     class="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
@@ -574,7 +596,7 @@
                 <div class="flex gap-3 mb-3">
                     <button onclick="toggleLinkingMode()" id="link-mode-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition flex items-center gap-2">
                         <span>🔗</span>
-                        <span>Ativar Modo Vinculação</span>
+                        <span>Ativar Modo Vinculação de Tombo</span>
                     </button>
                     <button onclick="reanalyzeWithLinks()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition flex items-center gap-2">
                         <span>🔄</span>
@@ -671,15 +693,21 @@
             <div class="flex justify-between items-center border-b-2 border-purple-200 p-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-2xl">
                 <div>
                     <h2 class="text-3xl font-bold">🔗 Vinculações Salvas</h2>
-                    <p class="text-purple-100 mt-1">Gerencie todos os vínculos entre itens</p>
+                    <p class="text-purple-100 mt-1">Gerencie todos os vínculos entre locais e itens</p>
                 </div>
                 <button onclick="closeLinkManager()" class="text-white hover:text-gray-200 text-4xl transition-colors">
                     &times;
                 </button>
             </div>
             <div class="p-6 overflow-y-auto custom-scrollbar" style="max-height: calc(80vh - 180px);">
-                <div id="link-list-container">
-                    <!-- Lista será preenchida dinamicamente -->
+                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">Vínculos de Localização</h3>
+                <div id="local-link-list-container" class="mb-6 space-y-2">
+                    <!-- Lista de Vínculos de Local será preenchida dinamicamente -->
+                </div>
+                
+                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">Vínculos de Tombo/Item</h3>
+                <div id="item-link-list-container">
+                    <!-- Lista de Vínculos de Item será preenchida dinamicamente -->
                 </div>
             </div>
             <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
@@ -719,21 +747,108 @@
         </div>
     </div>
 
+    <!-- MODAL DE LOCAL LINKING -->
+     <div id="local-linking-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeLocalLinkingModal()">
+        <div class="modal-content bg-white w-full max-w-4xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="flex justify-between items-center border-b-2 border-gray-200 p-6 bg-gradient-to-r from-inventario to-blue-700 text-white rounded-t-2xl">
+                <div>
+                    <h2 class="text-3xl font-bold">🗺️ Vinculação de Local</h2>
+                    <p class="text-blue-100 mt-1">Selecione locais diferentes que representam a mesma área</p>
+                </div>
+                <button onclick="closeLocalLinkingModal()" class="text-white hover:text-gray-200 text-4xl transition-colors">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Instrução de Vínculo de Local -->
+            <div id="local-linking-info" class="px-6 pt-4 pb-2 bg-blue-50 border-b-2 border-blue-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl link-active">🔗</span>
+                        <div>
+                            <p class="font-bold text-blue-800">Modo de Localização Ativo</p>
+                            <p class="text-sm text-blue-600">Selecione 1 Local do Inventário e 1 Local do Sistema para criar o vínculo.</p>
+                        </div>
+                    </div>
+                     <button onclick="cancelLocalLinking()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition">
+                        ✖ Cancelar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Busca -->
+            <div class="px-6 pt-4 pb-2">
+                <div class="search-box relative">
+                    <input 
+                        type="text" 
+                        id="local-modal-search" 
+                        class="w-full p-3 pl-10 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-inventario focus:border-inventario transition" 
+                        placeholder="🔎 Buscar local por nome ou unidade..."
+                        oninput="searchLocalModalItems(this.value)"
+                    />
+                    <span class="absolute left-3 top-3.5 text-gray-400 text-xl">🔍</span>
+                </div>
+            </div>
+
+            <!-- Listas de Locais -->
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                <div class="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
+                    <h3 class="text-xl font-bold text-inventario mb-3 flex items-center gap-2">
+                        <span class="text-2xl">📋</span>
+                        <span>Locais do Inventário</span>
+                    </h3>
+                    <ul id="local-inv-list" class="space-y-2 text-sm text-gray-700">
+                    </ul>
+                </div>
+                
+                <div class="bg-orange-50 rounded-xl p-5 border-2 border-orange-200">
+                    <h3 class="text-xl font-bold text-sistema mb-3 flex items-center gap-2">
+                        <span class="text-2xl">⚙️</span>
+                        <span>Locais do Sistema</span>
+                    </h3>
+                    <ul id="local-sis-list" class="space-y-2 text-sm text-gray-700">
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                <button onclick="reanalyzeWithLinks()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition">
+                    🔄 Reanalisar e Fechar
+                </button>
+                <button 
+                    onclick="closeLocalLinkingModal()" 
+                    class="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-bold rounded-xl hover:from-gray-700 hover:to-gray-800 transition duration-200 shadow-lg"
+                >
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         // === VARIÁVEIS GLOBAIS ===
         let auditData = [];
-        let globalInventarioData = []; // Armazena a linha completa do Inventário
-        let globalSistemaData = [];    // Armazena a linha completa do Sistema
+        let globalInventarioData = []; 
+        let globalSistemaData = [];    
         let uniqueUnits = new Set();
         let discrepancyDetails = new Map(); 
         let currentSearchTerm = '';
         
-        // NOVO: Sistema de Vinculação
+        // VINCULAÇÃO DE ITEM/TOMBO
         let itemLinks = new Map(); 
-        let linkingMode = false;
+        let itemLinkingMode = false;
         let selectedInvItem = null;
         let selectedSysItem = null;
         let currentCompositeKey = '';
+
+        // VINCULAÇÃO DE LOCAL (REQ 1)
+        let locationLinks = new Map(); // Map<compositeKeyInv, compositeKeySis>
+        let locationLinkingMode = false;
+        let selectedInvLocation = null;
+        let selectedSysLocation = null;
         
         // Cabeçalhos de exportação final (definidos pelo usuário)
         const FINAL_HEADERS = ['Tipo', 'Tombamento', 'Descrição', 'Unidade', 'Quantidade', 'Localização', 'Estado', 'Origem da Doação', 'Observação', 'Fornecedor'];
@@ -744,37 +859,53 @@
                 UNIT: 'unidade',
                 LOCAL: 'local',
                 ITEM: 'item',
-                ID: 'tombo' 
+                ID: 'tombo',
+                STATE: 'estado' // REQ 2
             },
             SIS: {
                 UNIT: 'unidade',
                 LOCAL: 'localizacao',
                 ITEM: 'descricao',
-                ID: 'tombamento'
+                ID: 'tombamento',
+                STATE: 'estado' // REQ 2
             }
         };
 
         // Carrega links do localStorage
         function loadLinksFromStorage() {
-            const stored = localStorage.getItem('itemLinks');
-            if (stored) {
+            const storedItem = localStorage.getItem('itemLinks');
+            const storedLocal = localStorage.getItem('locationLinks'); // NOVO: Carrega links de local
+
+            if (storedItem) {
                 try {
-                    const parsed = JSON.parse(stored);
+                    const parsed = JSON.parse(storedItem);
                     itemLinks = new Map(Object.entries(parsed).map(([key, val]) => [key, new Map(Object.entries(val))]));
-                    updateLinkCount();
                 } catch (e) {
-                    console.error('Erro ao carregar links:', e);
+                    console.error('Erro ao carregar links de item:', e);
                 }
             }
+             if (storedLocal) {
+                try {
+                    locationLinks = new Map(Object.entries(JSON.parse(storedLocal)));
+                } catch (e) {
+                    console.error('Erro ao carregar links de local:', e);
+                }
+            }
+
+            updateLinkCount();
         }
 
         // Salva links no localStorage
         function saveLinksToStorage() {
-            const obj = {};
+            const itemObj = {};
             itemLinks.forEach((value, key) => {
-                obj[key] = Object.fromEntries(value);
+                itemObj[key] = Object.fromEntries(value);
             });
-            localStorage.setItem('itemLinks', JSON.stringify(obj));
+            localStorage.setItem('itemLinks', JSON.stringify(itemObj));
+            
+            // NOVO: Salva links de local
+            localStorage.setItem('locationLinks', JSON.stringify(Object.fromEntries(locationLinks)));
+
             updateLinkCount();
         }
 
@@ -782,6 +913,10 @@
         function updateLinkCount() {
             let total = 0;
             itemLinks.forEach(map => total += map.size);
+            
+            // Inclui contagem de links de local no total
+            total += locationLinks.size; 
+
             document.getElementById('link-count').textContent = total;
             document.getElementById('modal-link-count').textContent = total;
         }
@@ -879,7 +1014,6 @@
         function groupItems(items) {
             const grouped = new Map();
             items.forEach(item => {
-                // item é um objeto de linha completa, usamos o nome do item (ID/Tombo) como chave
                 const itemId = item.itemId; 
                 grouped.set(itemId, (grouped.get(itemId) || 0) + 1);
             });
@@ -935,7 +1069,7 @@
              return headers.find(h => normalizeString(h).includes(normalizedKey));
         }
 
-        // Processa dados e adiciona metadados (IDs)
+        // Processa dados e aplica Vinculação de Local (REQ 1)
         async function processAuditData() {
             const inventarioMap = new Map();
             const sistemaMap = new Map();
@@ -948,13 +1082,15 @@
             
             const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
             const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
-            const invItemCol = findColumn(invHeader, COLUMNS.INV.ITEM); // Descrição do item (Item)
-            const invIdCol = findColumn(invHeader, COLUMNS.INV.ID);     // ID do Tombamento (Tombo)
+            const invItemCol = findColumn(invHeader, COLUMNS.INV.ITEM);
+            const invIdCol = findColumn(invHeader, COLUMNS.INV.ID);     
+            const invStateCol = findColumn(invHeader, COLUMNS.INV.STATE); // REQ 2
             
             const sisUnitCol = findColumn(sisHeader, COLUMNS.SIS.UNIT);
             const sisLocalCol = findColumn(sisHeader, COLUMNS.SIS.LOCAL);
-            const sisItemCol = findColumn(sisHeader, COLUMNS.SIS.ITEM); // Descrição do item (Descrição)
-            const sisIdCol = findColumn(sisHeader, COLUMNS.SIS.ID);     // ID do Tombamento (Tombamento)
+            const sisItemCol = findColumn(sisHeader, COLUMNS.SIS.ITEM);
+            const sisIdCol = findColumn(sisHeader, COLUMNS.SIS.ID);     
+            const sisStateCol = findColumn(sisHeader, COLUMNS.SIS.STATE); // REQ 2
             
             // Validação de Colunas (usando ID como obrigatório para Tombo)
             if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' não encontrada no Inventário. Verifique o cabeçalho.");
@@ -963,63 +1099,75 @@
             if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' ou 'Local' não encontrada no Sistema. Verifique o cabeçalho.");
             if (globalSistemaData.length > 0 && !sisIdCol) throw new Error("Coluna 'Tombamento' (Sistema) não encontrada. Verifique o cabeçalho.");
 
-
             // Processa Inventário: usa o Tombo como identificador de item (item ID)
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
-                const local = normalizeString(item[invLocalCol] || 'sem local');
+                const local = invLocalCol ? (item[invLocalCol] || 'sem local') : 'sem local'; // Local original
+                
+                // REQ 1: Aplica Vinculação de Local
+                const invCompositeKey = `${unidade}|${normalizeString(local)}`;
+                const mappedSisCompositeKey = locationLinks.get(invCompositeKey);
+                
+                // Se houver vínculo, mapeia para a chave normalizada do Sistema
+                const compositeKey = mappedSisCompositeKey || invCompositeKey;
+                
+                // O local original para exibição deve ser o local do Inventário, mas a chave de comparação pode ser a mapeada
+                const localOriginal = local; 
+
                 const itemId = invIdCol ? (item[invIdCol] || `Item sem Tombo Inv-${Math.random()}`).trim() : `Item sem Tombo Inv-${Math.random()}`;
-                const compositeKey = `${unidade}|${local}`;
                 
                 allCompositeKeys.add(compositeKey);
                 
                 if (!inventarioMap.has(compositeKey)) {
                     inventarioMap.set(compositeKey, { 
                         count: 0, 
-                        items: [], // Array de objetos { itemId, data: {objeto linha completa} }
+                        items: [],
                         originalUnit: item[invUnitCol] || 'Sem Unidade', 
-                        originalLocal: item[invLocalCol] || 'Sem Local' 
+                        originalLocal: localOriginal || 'Sem Local',
+                        actualInvKey: invCompositeKey
                     });
                 }
                 const data = inventarioMap.get(compositeKey);
                 data.count++;
                 
-                // Salva a linha completa
                 data.items.push({ 
                     itemId: itemId, 
                     data: item, 
-                    // Adiciona a descrição para o modal
-                    description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`
+                    description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
+                    state: invStateCol ? (item[invStateCol] || '-').trim() : '-' // REQ 2
                 });
             });
             
             // Processa Sistema: usa o Tombamento como identificador de item (item ID)
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
-                const local = sisLocalCol ? normalizeString(item[sisLocalCol] || 'sem local') : 'sem local';
+                const local = sisLocalCol ? (item[sisLocalCol] || 'sem local') : 'sem local'; // Local original
+                const compositeKey = `${unidade}|${normalizeString(local)}`;
+                
+                const localOriginal = local; 
+
                 const itemId = sisIdCol ? (item[sisIdCol] || `Item sem Tombo Sis-${Math.random()}`).trim() : `Item sem Tombo Sis-${Math.random()}`;
-                const compositeKey = `${unidade}|${local}`;
 
                 allCompositeKeys.add(compositeKey);
 
                 if (!sistemaMap.has(compositeKey)) {
                     sistemaMap.set(compositeKey, { 
                         count: 0, 
-                        items: [], // Array de objetos { itemId, data: {objeto linha completa} }
+                        items: [],
                         originalUnit: item[sisUnitCol] || 'Sem Unidade', 
-                        originalLocal: item[sisLocalCol] || 'Sem Local' 
+                        originalLocal: localOriginal || 'Sem Local' ,
+                        actualSisKey: compositeKey
                     });
                 }
                 const data = sistemaMap.get(compositeKey);
                 
                 data.count++;
                 
-                // Salva a linha completa
                 data.items.push({ 
                     itemId: itemId, 
                     data: item,
-                    // Adiciona a descrição para o modal
-                    description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`
+                    description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
+                    state: sisStateCol ? (item[sisStateCol] || '-').trim() : '-' // REQ 2
                 });
             });
 
@@ -1028,20 +1176,45 @@
             for (const compositeKey of sortedKeys) {
                 if (compositeKey === "sem unidade|sem local") continue;
                 
-                const [unidade, local] = compositeKey.split('|');
+                // Se a chave composta pertence ao Sistema, e não há um Inventário mapeado para ela, continua normal.
+                // Se a chave composta é do Inventário e foi mapeada, ela já foi tratada.
+                // A chave composta agora é a CHAVE DE COMPARAÇÃO (que pode ser do Inventário OU do Sistema mapeado).
+
+                const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualInvKey: '' };
+                const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualSisKey: '' };
                 
-                const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
-                const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '' };
-                
+                // Se não há dados em NENHUMA das fontes para essa chave, ignora.
+                if (invData.count === 0 && sisData.count === 0) continue;
+
+
                 const qtdInv = invData.count;
                 const qtdSis = sisData.count;
                 const diff = qtdInv - qtdSis;
 
+                // REQ 4: Só processa e adiciona se houver divergência
+                let hasQuantityDivergence = diff !== 0;
+                let hasTombamentoDivergence = false;
+
+                const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
+                const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
+
+                // Checa Divergência de Tombamento
                 if (qtdInv > 0 || qtdSis > 0) {
+                    let invOnly = [...invIds].some(id => !sisIds.has(id));
+                    let sisOnly = [...sisIds].some(id => !invIds.has(id));
+                    
+                    if (qtdInv === qtdSis && [...invIds].length !== [...sisIds].length) {
+                         hasTombamentoDivergence = true;
+                    } else if (invOnly || sisOnly) {
+                         hasTombamentoDivergence = true;
+                    }
+                }
+                
+                if (hasQuantityDivergence || hasTombamentoDivergence) {
                     const auditRow = {
                         key: compositeKey,
-                        unidade: unidade,
-                        local: local,
+                        unidade: invData.originalUnit || sisData.originalUnit,
+                        local: invData.originalLocal || sisData.originalLocal,
                         originalUnit: invData.originalUnit || sisData.originalUnit,
                         originalLocal: invData.originalLocal || sisData.originalLocal,
                         qtdInv: qtdInv,
@@ -1050,45 +1223,22 @@
                     };
                     auditData.push(auditRow);
                     
-                    let hasQuantityDivergence = diff !== 0;
-                    let hasTombamentoDivergence = false;
-                    
-                    const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
-                    const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
-
-                    // Checa Divergência de Tombamento
-                    if (qtdInv > 0 || qtdSis > 0) {
-                        // Se houver algum ID em Inv que não está em Sis OU vice-versa
-                        let invOnly = [...invIds].some(id => !sisIds.has(id));
-                        let sisOnly = [...sisIds].some(id => !invIds.has(id));
-                        
-                        // Ou se as contagens são iguais, mas os conjuntos de IDs são diferentes
-                        if (qtdInv === qtdSis && [...invIds].length !== [...sisIds].length) {
-                             hasTombamentoDivergence = true;
-                        } else if (invOnly || sisOnly) {
-                             hasTombamentoDivergence = true;
-                        }
-                    }
-                    
-                    // Adiciona se houver qualquer divergência
-                    if (hasQuantityDivergence || hasTombamentoDivergence) {
-                        discrepancyDetails.set(compositeKey, {
-                            unidade: auditRow.originalUnit,
-                            local: auditRow.originalLocal,
-                            invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), // Objetos completos
-                            sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  // Objetos completos
-                            hasQuantityDivergence: hasQuantityDivergence,
-                            hasTombamentoDivergence: hasTombamentoDivergence,
-                            qtdInv: qtdInv,
-                            qtdSis: qtdSis,
-                            diff: diff
-                        });
-                    }
+                    discrepancyDetails.set(compositeKey, {
+                        unidade: auditRow.originalUnit,
+                        local: auditRow.originalLocal,
+                        invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), 
+                        sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  
+                        hasQuantityDivergence: hasQuantityDivergence,
+                        hasTombamentoDivergence: hasTombamentoDivergence,
+                        qtdInv: qtdInv,
+                        qtdSis: qtdSis,
+                        diff: diff
+                    });
                 }
             }
         }
 
-        // REQ 1: Popula filtro com APENAS unidades que contêm divergência
+        // REQ 3: Popula filtro com APENAS unidades que contêm divergência
         function populateUnitFilter() {
             uniqueUnits = new Set();
             const filterSelect = document.getElementById('unit-filter');
@@ -1116,7 +1266,7 @@
             });
         }
 
-        // REQ 5: Renderiza cards em modo lista agrupada por Unidade
+        // REQ 4: Só exibe cards para locais com divergência
         function filterResultCards(selectedUnit) {
             const cardsContainer = document.getElementById('discrepancy-cards-container');
             const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
@@ -1197,7 +1347,7 @@
             `;
         }
 
-        // REQ 3, 4: Cria card com aviso de divergência combinada
+        // Cria card com aviso de divergência combinada
         function createDiscrepancyCard(details, compositeKey) {
             const item = details;
             
@@ -1302,21 +1452,21 @@
             filterResultCards(selectedUnit);
         }, 300);
 
-        // === SISTEMA DE VINCULAÇÃO ===
+        // === SISTEMA DE VINCULAÇÃO DE ITEM/TOMBO ===
 
         function toggleLinkingMode() {
-            linkingMode = !linkingMode;
+            itemLinkingMode = !itemLinkingMode;
             const btn = document.getElementById('link-mode-btn');
             const info = document.getElementById('linking-info');
             
-            if (linkingMode) {
+            if (itemLinkingMode) {
                 btn.innerHTML = '<span>✖</span><span>Desativar Vinculação</span>';
                 btn.className = 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition flex items-center gap-2';
                 info.classList.remove('hidden');
                 selectedInvItem = null;
                 selectedSysItem = null;
             } else {
-                btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação</span>';
+                btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação de Tombo</span>';
                 btn.className = 'px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition flex items-center gap-2';
                 info.classList.add('hidden');
                 cancelLinking();
@@ -1332,10 +1482,10 @@
         function cancelLinking() {
             selectedInvItem = null;
             selectedSysItem = null;
-            linkingMode = false;
+            itemLinkingMode = false;
             document.getElementById('linking-info').classList.add('hidden');
             const btn = document.getElementById('link-mode-btn');
-            btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação</span>';
+            btn.innerHTML = '<span>🔗</span><span>Ativar Modo Vinculação de Tombo</span>';
             btn.className = 'px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition flex items-center gap-2';
             
             document.querySelectorAll('.item-selected').forEach(el => el.classList.remove('item-selected'));
@@ -1348,7 +1498,7 @@
 
         // Função para selecionar item - usa o itemId (Tombo/Tombamento)
         function selectItemForLinking(event, itemId, isInventory) {
-            if (!linkingMode) return;
+            if (!itemLinkingMode) return;
             
             event.stopPropagation(); 
             
@@ -1366,12 +1516,12 @@
             }
             
             if (selectedInvItem && selectedSysItem) {
-                createLink(selectedInvItem, selectedSysItem);
+                createItemLink(selectedInvItem, selectedSysItem);
             }
         }
 
         // Cria link e melhora efeito de escolha (itens somem)
-        function createLink(invItem, sysItem) {
+        function createItemLink(invItem, sysItem) {
             if (!itemLinks.has(currentCompositeKey)) {
                 itemLinks.set(currentCompositeKey, new Map());
             }
@@ -1408,15 +1558,175 @@
             }
         }
 
-        function removeLink(compositeKey, invItem) {
-            if (itemLinks.has(compositeKey)) {
-                itemLinks.get(compositeKey).delete(invItem);
-                if (itemLinks.get(compositeKey).size === 0) {
-                    itemLinks.delete(compositeKey);
-                }
-                saveLinksToStorage();
-                updateLinkManagerDisplay();
+        // === VINCULAÇÃO DE LOCAL (REQ 1) ===
+
+        function toggleLocalLinkingMode() {
+            // Inicializa e popula o modal de Local Linking
+            setupLocalLinkingModal();
+            
+            const modal = document.getElementById('local-linking-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            locationLinkingMode = true; // Ativa modo
+            selectedInvLocation = null;
+            selectedSysLocation = null;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        function setupLocalLinkingModal() {
+            const invList = document.getElementById('local-inv-list');
+            const sisList = document.getElementById('local-sis-list');
+            invList.innerHTML = '';
+            sisList.innerHTML = '';
+
+            // 1. Coleta todos os locais únicos do Inventário
+            const uniqueInvLocations = new Map(); // Map<compositeKey, {unit, local}>
+            globalInventarioData.forEach(item => {
+                const unidade = item[findColumn(Object.keys(item), COLUMNS.INV.UNIT)] || 'Sem Unidade';
+                const local = item[findColumn(Object.keys(item), COLUMNS.INV.LOCAL)] || 'Sem Local';
+                const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                uniqueInvLocations.set(key, { unit: unidade, local: local, key: key });
+            });
+            
+            // 2. Coleta todos os locais únicos do Sistema
+            const uniqueSisLocations = new Map(); // Map<compositeKey, {unit, local}>
+            globalSistemaData.forEach(item => {
+                const unidade = item[findColumn(Object.keys(item), COLUMNS.SIS.UNIT)] || 'Sem Unidade';
+                const local = item[findColumn(Object.keys(item), COLUMNS.SIS.LOCAL)] || 'Sem Local';
+                const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                uniqueSisLocations.set(key, { unit: unidade, local: local, key: key });
+            });
+            
+            // 3. Renderiza listas
+            const renderLocationList = (map, isInventory, listElement) => {
+                [...map.values()].sort((a, b) => a.unit.localeCompare(b.unit) || a.local.localeCompare(b.local)).forEach(loc => {
+                    const li = document.createElement('li');
+                    
+                    const isLinked = isInventory 
+                        ? locationLinks.has(loc.key) 
+                        : Array.from(locationLinks.values()).includes(loc.key);
+                    
+                    const linkedTarget = isInventory ? locationLinks.get(loc.key) : Array.from(locationLinks.entries()).find(([invKey, sisKey]) => sisKey === loc.key)?.[0];
+
+                    li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer location-link-mode ${isLinked ? 'item-linked' : ''}`;
+                    li.setAttribute('onclick', `selectLocationForLinking(event, '${loc.key.replace(/'/g, "\\'")}', ${isInventory})`);
+
+                    let badge = '';
+                    if (isLinked) {
+                        const targetName = isInventory 
+                            ? (uniqueSisLocations.get(linkedTarget)?.local || 'Desconhecido') 
+                            : (uniqueInvLocations.get(linkedTarget)?.local || 'Desconhecido');
+                        badge = `<span class="link-badge ml-2">🔗 VINCULADO a: ${targetName}</span>`;
+                    }
+                    
+                    li.innerHTML = `
+                        <div class="font-semibold">${loc.local}</div>
+                        <div class="text-xs text-gray-500">🏢 ${loc.unit} ${badge}</div>
+                    `;
+                    listElement.appendChild(li);
+                });
+            };
+
+            renderLocationList(uniqueInvLocations, true, invList);
+            renderLocationList(uniqueSisLocations, false, sisList);
+        }
+
+        function selectLocationForLinking(event, locationKey, isInventory) {
+            event.stopPropagation();
+            
+            const clickedLi = event.target.closest('li');
+            if (!clickedLi) return;
+
+            // Remove seleções antigas
+            document.querySelectorAll('#local-linking-modal .location-selected').forEach(el => el.classList.remove('location-selected'));
+
+            if (isInventory) {
+                selectedInvLocation = locationKey;
+                clickedLi.classList.add('location-selected');
+                selectedSysLocation = null; // Reseta o outro lado
+            } else {
+                selectedSysLocation = locationKey;
+                clickedLi.classList.add('location-selected');
+                selectedInvLocation = null; // Reseta o outro lado
             }
+            
+            // Se ambos estão selecionados (pode ser em clicks separados, então verificamos o estado)
+            // Clicou no INV, selecionou, agora procura por um SYS selecionado anteriormente
+            const selectedInvElement = document.querySelector('#local-inv-list .location-selected');
+            const selectedSysElement = document.querySelector('#local-sis-list .location-selected');
+
+            if (selectedInvLocation && selectedSysLocation) {
+                 // A ordem do último clique é importante, então forçamos a seleção se houver um par
+                 createLocationLink(selectedInvLocation, selectedSysLocation);
+            } else if (selectedInvElement && selectedSysElement) {
+                 const invKey = selectedInvElement.onclick.toString().match(/selectLocationForLinking\(event, '(.*?)', true\)/)?.[1];
+                 const sisKey = selectedSysElement.onclick.toString().match(/selectLocationForLinking\(event, '(.*?)', false\)/)?.[1];
+                 createLocationLink(invKey, sisKey);
+            }
+            
+            // Verifica o par
+            if (selectedInvLocation && selectedSysLocation) {
+                createLocationLink(selectedInvLocation, selectedSysLocation);
+            }
+        }
+
+        function createLocationLink(invKey, sisKey) {
+            locationLinks.set(invKey, sisKey);
+            saveLinksToStorage();
+            
+            showCustomAlert(`✅ Vínculo de Local criado!\n📋 Inventário Key: ${invKey}\n⚙️ Sistema Key: ${sisKey}`);
+            
+            // Reseta seleção visual e interna
+            cancelLocalLinking(); 
+            // Atualiza a lista no modal para refletir o novo link
+            setupLocalLinkingModal();
+        }
+
+        function cancelLocalLinking() {
+            selectedInvLocation = null;
+            selectedSysLocation = null;
+            document.querySelectorAll('#local-linking-modal .location-selected').forEach(el => el.classList.remove('location-selected'));
+            locationLinkingMode = false;
+        }
+
+        function closeLocalLinkingModal() {
+            cancelLocalLinking();
+            const modal = document.getElementById('local-linking-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // --- Funções de Alerta e Confirmação (Mantidas) ---
+
+        function removeLink(compositeKey, invItem) {
+            // Verifica se é um link de local ou de item
+            if (compositeKey === 'LOCAL_LINK') {
+                locationLinks.delete(invItem); // invItem é o invKey nesse contexto
+                showCustomAlert(`✅ Vínculo de Local removido: ${invItem}`);
+            } else {
+                if (itemLinks.has(compositeKey)) {
+                    itemLinks.get(compositeKey).delete(invItem);
+                    if (itemLinks.get(compositeKey).size === 0) {
+                        itemLinks.delete(compositeKey);
+                    }
+                    showCustomAlert(`✅ Vínculo de Item removido: ${invItem}`);
+                }
+            }
+            saveLinksToStorage();
+            updateLinkManagerDisplay();
         }
 
         // Função de confirmação customizada
@@ -1504,8 +1814,9 @@
 
 
         function clearAllLinks() {
-            showCustomConfirm('⚠️ Tem certeza que deseja limpar TODAS as vinculações?', () => {
+            showCustomConfirm('⚠️ Tem certeza que deseja limpar TODAS as vinculações de Local e Item?', () => {
                 itemLinks.clear();
+                locationLinks.clear();
                 saveLinksToStorage();
                 showCustomAlert('✅ Todas as vinculações foram removidas!');
             });
@@ -1513,10 +1824,11 @@
 
         function reanalyzeWithLinks() {
             closeModal();
+            closeLocalLinkingModal(); // Fecha o modal de local linking se estiver aberto
             runMasterCount();
         }
 
-        // === MODAL ===
+        // === MODAL DE ITEM ===
         
         let currentModalData = { invItems: [], sisItems: [] };
         
@@ -1553,11 +1865,11 @@
             const sisQtyMap = groupItems(rawSisItems);
             
             // Aplica vinculações para determinar itens "consumidos"
-            const locationLinks = itemLinks.get(currentCompositeKey) || new Map();
+            const locationItemLinks = itemLinks.get(currentCompositeKey) || new Map();
             const tempInvQtyMap = new Map(invQtyMap);
             const tempSisQtyMap = new Map(sisQtyMap);
 
-            locationLinks.forEach((sysId, invId) => {
+            locationItemLinks.forEach((sysId, invId) => {
                 const invQty = tempInvQtyMap.get(invId) || 0;
                 const sisQty = tempSisQtyMap.get(sysId) || 0;
 
@@ -1581,7 +1893,8 @@
                                 list.push({
                                     itemId: itemId,
                                     description: itemData.description,
-                                    totalQty: qty // Usamos a quantidade total restante aqui
+                                    totalQty: qty, // Usamos a quantidade total restante aqui
+                                    state: itemData.state // REQ 2
                                 });
                             }
                         }
@@ -1615,25 +1928,26 @@
                 let indexCounter = 0;
 
                 filteredInvItems.forEach((itemData) => {
-                    const { itemId, description, totalQty } = itemData;
+                    const { itemId, description, totalQty, state } = itemData;
 
                     if (itemId !== currentItemId) {
                         currentItemId = itemId;
                         indexCounter++;
                         
                         const li = document.createElement('li');
-                        // No modal, só restam itens "Só Inventário"
-                        li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-inv ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
-                        if (linkingMode) {
+                        li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-inv ${itemLinkingMode ? 'linking-mode cursor-pointer' : ''}`;
+                        if (itemLinkingMode) {
                             li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', true)`);
                         }
                         
+                        // REQ 2: Adiciona o Estado do Tombo
                         li.innerHTML = `
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                                <span class="flex-1 font-medium">ID: ${itemId} | Descrição: ${description}</span>
+                                <span class="flex-1 font-medium">ID: ${itemId} | ${description}</span>
                             </div>
-                            <div class="ml-9">
+                            <div class="ml-9 flex flex-wrap gap-2 items-center">
+                                <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
                                 <span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">⚠️ Restante (Qtd: ${totalQty})</span>
                             </div>
                         `;
@@ -1651,25 +1965,26 @@
                 let indexCounter = 0;
 
                 filteredSisItems.forEach((itemData) => {
-                    const { itemId, description, totalQty } = itemData;
+                    const { itemId, description, totalQty, state } = itemData;
 
                     if (itemId !== currentItemId) {
                         currentItemId = itemId;
                         indexCounter++;
                         
                         const li = document.createElement('li');
-                        // No modal, só restam itens "Só Sistema"
-                        li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-sys ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
-                        if (linkingMode) {
+                        li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-sys ${itemLinkingMode ? 'linking-mode cursor-pointer' : ''}`;
+                        if (itemLinkingMode) {
                             li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', false)`);
                         }
                         
+                        // REQ 2: Adiciona o Estado do Tombo
                         li.innerHTML = `
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                                <span class="flex-1 font-medium">ID: ${itemId} | Descrição: ${description}</span>
+                                <span class="flex-1 font-medium">ID: ${itemId} | ${description}</span>
                             </div>
-                            <div class="ml-9">
+                            <div class="ml-9 flex flex-wrap gap-2 items-center">
+                                <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
                                 <span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">⚠️ Restante (Qtd: ${totalQty})</span>
                             </div>
                         `;
@@ -1743,50 +2058,79 @@
         }
 
         function updateLinkManagerDisplay() {
-            const container = document.getElementById('link-list-container');
-            container.innerHTML = '';
+            const itemContainer = document.getElementById('item-link-list-container');
+            const localContainer = document.getElementById('local-link-list-container');
             
+            itemContainer.innerHTML = '';
+            localContainer.innerHTML = '';
+            
+            // Item Links
             if (itemLinks.size === 0) {
-                container.innerHTML = '<p class="text-center text-gray-500 italic p-8">Nenhuma vinculação criada ainda</p>';
-                return;
+                itemContainer.innerHTML = '<p class="text-center text-gray-500 italic p-4">Nenhuma vinculação de item criada</p>';
+            } else {
+                itemLinks.forEach((links, compositeKey) => {
+                    const [unidade, local] = compositeKey.split('|');
+                    
+                    const section = document.createElement('div');
+                    section.className = 'mb-4 p-3 bg-purple-50 rounded-xl border border-purple-200';
+                    section.innerHTML = `<h4 class="font-bold text-sm text-purple-800 mb-2">📍 ${local.toUpperCase()} (${unidade.toUpperCase()})</h4><div class="space-y-1"></div>`;
+                    
+                    const listContainer = section.querySelector('.space-y-1');
+                    
+                    links.forEach((sysItem, invItem) => {
+                        const linkItem = document.createElement('div');
+                        linkItem.className = 'flex items-center justify-between bg-white p-2 rounded-lg shadow-sm text-xs';
+                        linkItem.innerHTML = `
+                            <div class="flex-1">
+                                <span class="font-semibold text-blue-700">Inv Tombo: ${invItem}</span>
+                                <span class="mx-1 text-purple-600">🔗</span>
+                                <span class="font-semibold text-orange-700">Sis Tombamento: ${sysItem}</span>
+                            </div>
+                            <button onclick="removeLink('${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
+                                🗑️
+                            </button>
+                        `;
+                        listContainer.appendChild(linkItem);
+                    });
+                    
+                    itemContainer.appendChild(section);
+                });
             }
             
-            itemLinks.forEach((links, compositeKey) => {
-                const [unidade, local] = compositeKey.split('|');
-                
-                const section = document.createElement('div');
-                section.className = 'mb-6 p-4 bg-purple-50 rounded-xl border-2 border-purple-200';
-                section.innerHTML = `
-                    <h4 class="font-bold text-lg text-purple-800 mb-3">📍 ${local.toUpperCase()} (${unidade.toUpperCase()})</h4>
-                    <div class="space-y-2"></div>
-                `;
-                
-                const listContainer = section.querySelector('.space-y-2');
-                
-                links.forEach((sysItem, invItem) => {
+            // Local Links
+            if (locationLinks.size === 0) {
+                localContainer.innerHTML = '<p class="text-center text-gray-500 italic p-4">Nenhuma vinculação de local criada</p>';
+            } else {
+                locationLinks.forEach((sysKey, invKey) => {
+                    const [invUnit, invLocal] = invKey.split('|');
+                    const [sysUnit, sysLocal] = sysKey.split('|');
+
                     const linkItem = document.createElement('div');
-                    linkItem.className = 'flex items-center justify-between bg-white p-3 rounded-lg shadow';
+                    linkItem.className = 'flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-200 shadow-sm';
                     linkItem.innerHTML = `
-                        <div class="flex-1">
-                            <span class="font-semibold text-blue-700">📋 Tombo (Inv): ${invItem}</span>
-                            <span class="mx-2 text-purple-600">🔗</span>
-                            <span class="font-semibold text-orange-700">⚙️ Tombamento (Sis): ${sysItem}</span>
+                        <div class="flex-1 text-sm">
+                            <span class="font-bold text-blue-700">Inv: ${invLocal.toUpperCase()} (${invUnit.toUpperCase()})</span>
+                            <span class="mx-2 text-blue-600">🗺️ VINCULADO A</span>
+                            <span class="font-bold text-orange-700">Sis: ${sysLocal.toUpperCase()} (${sysUnit.toUpperCase()})</span>
                         </div>
-                        <button onclick="removeLink('${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
+                        <button onclick="removeLink('LOCAL_LINK', '${invKey.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
                             🗑️
                         </button>
                     `;
-                    listContainer.appendChild(linkItem);
+                    localContainer.appendChild(linkItem);
                 });
-                
-                container.appendChild(section);
-            });
+            }
+            
+            updateLinkCount();
         }
 
         function exportLinks() {
-            const data = {};
+            const data = {
+                itemLinks: {},
+                locationLinks: Object.fromEntries(locationLinks)
+            };
             itemLinks.forEach((value, key) => {
-                data[key] = Object.fromEntries(value);
+                data.itemLinks[key] = Object.fromEntries(value);
             });
             
             const json = JSON.stringify(data, null, 2);
@@ -1808,7 +2152,12 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        itemLinks = new Map(Object.entries(data).map(([key, val]) => [key, new Map(Object.entries(val))]));
+                        if (data.itemLinks) {
+                             itemLinks = new Map(Object.entries(data.itemLinks).map(([key, val]) => [key, new Map(Object.entries(val))]));
+                        }
+                        if (data.locationLinks) {
+                             locationLinks = new Map(Object.entries(data.locationLinks));
+                        }
                         saveLinksToStorage();
                         showCustomAlert('✅ Vinculações importadas com sucesso!');
                     } catch (error) {
@@ -1870,7 +2219,7 @@
             // Itera sobre as discrepâncias (locais)
             discrepancyDetails.forEach((details, compositeKey) => {
                 
-                const locationLinks = itemLinks.get(compositeKey) || new Map();
+                const locationItemLinks = itemLinks.get(compositeKey) || new Map();
                 
                 const invMap = groupItems(details.invItems); // Map<itemId, qty>
                 const sisMap = groupItems(details.sisItems); // Map<itemId, qty>
@@ -1882,7 +2231,7 @@
                 
                 // 1. Processa Itens do Inventário (o que deveria estar lá)
                 invMap.forEach((invQty, invId) => {
-                    const linkedSysId = locationLinks.get(invId);
+                    const linkedSysId = locationItemLinks.get(invId);
                     
                     if (linkedSysId) {
                         processedSysIds.add(linkedSysId);
@@ -1924,7 +2273,7 @@
                     
                     if (processedSysIds.has(sisId)) {
                         // Item foi vinculado. Checa se sobrou no Sistema.
-                        let linkedInvId = Array.from(locationLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
+                        let linkedInvId = Array.from(locationItemLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
 
                         const originalInvQty = invMap.get(linkedInvId) || 0;
                         const diff = sisQty - originalInvQty; // Sis - Inv
@@ -1938,7 +2287,7 @@
                                 }
                             }
                         }
-                    } else if (locationLinks.has(sisId)) {
+                    } else if (Array.from(locationItemLinks.values()).includes(sisId)) {
                         // Se esse sisId é o TARGET de um link, já foi tratado pelo invMap
                         return;
                     } else {
@@ -2111,7 +2460,7 @@
             const reportData = [];
 
             discrepancyDetails.forEach((details, compositeKey) => {
-                const locationLinks = itemLinks.get(compositeKey) || new Map();
+                const locationItemLinks = itemLinks.get(compositeKey) || new Map();
                 const invMap = groupItems(details.invItems);
                 const sisMap = groupItems(details.sisItems);
                 
@@ -2119,7 +2468,7 @@
                 const tempSisMap = new Map(sisMap);
                 
                 // 1. Processa Links para subtrair quantidades
-                locationLinks.forEach((sysId, invId) => {
+                locationItemLinks.forEach((sysId, invId) => {
                     const invQty = tempInvMap.get(invId) || 0;
                     const sisQty = tempSisMap.get(sysId) || 0;
                     const consumed = Math.min(invQty, sisQty);
@@ -2133,7 +2482,7 @@
                 tempInvMap.forEach((qty, invId) => {
                     if (qty > 0) {
                         const invItemData = details.invItems.find(i => i.itemId === invId).data;
-                        const linkedTo = locationLinks.get(invId);
+                        const linkedTo = locationItemLinks.get(invId);
                         
                         for (let i = 0; i < qty; i++) {
                             const row = {
@@ -2159,7 +2508,7 @@
                 tempSisMap.forEach((qty, sisId) => {
                     if (qty > 0) {
                         const sisItemData = details.sisItems.find(i => i.itemId === sisId).data;
-                        let linkedFrom = Array.from(locationLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
+                        let linkedFrom = Array.from(locationItemLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
                         
                         for (let i = 0; i < qty; i++) {
                             const row = {
@@ -2207,8 +2556,8 @@
             const filename = `Relatorio_Tombamento_Final_${timestamp}.csv`;
 
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
             link.setAttribute("download", filename);
             link.style.visibility = 'hidden';
@@ -2287,6 +2636,7 @@
                     closeModal();
                     closeLinkManager();
                     closeFinalReport();
+                    closeLocalLinkingModal();
                     
                     const confirmModal = document.getElementById('custom-confirm');
                     if(confirmModal) confirmModal.remove();
