@@ -1043,6 +1043,7 @@
 
             const firstLine = lines[0];
             
+            // 1. Prioriza tabulação (copiar de planilha)
             const separators = {
                 '\t': (firstLine.match(/\t/g) || []).length,
                 ';': (firstLine.match(/;/g) || []).length,
@@ -1050,21 +1051,40 @@
                 '|': (firstLine.match(/\|/g) || []).length
             };
             
-            const separator = Object.keys(separators).reduce((a, b) => 
-                separators[a] > separators[b] ? a : b
-            );
+            let separator = '\t'; // Default to tab
+            let maxCount = separators['\t'];
 
-            if (separators[separator] === 0) return [];
-
-            const rawHeaders = lines[0].split(separator).map(h => h.trim());
+            // Se a tabulação não for o separador mais comum, encontra o mais comum.
+            Object.keys(separators).forEach(sep => {
+                if (separators[sep] > maxCount) {
+                    maxCount = separators[sep];
+                    separator = sep;
+                }
+            });
+            
+            if (maxCount === 0) {
+                 // Última tentativa: se a primeira linha não tem separadores óbvios, tratamos como um único campo (para evitar crash total, embora o parse seja falho)
+                 if (lines.length > 1) {
+                     // Tentativa de adivinhar separadores compactos que o usuário colou (ex: sem espaços)
+                     // Nesses casos é melhor quebrar o código do que retornar um array vazio e causar erro de cabeçalho
+                 }
+                 // Se não encontrou separador, retorna com a primeira linha, o que forçará o erro de validação de colunas, mas evitará um crash aqui.
+                 // Vamos forçar o erro mais claro no cabeçalho.
+                 
+                 // CORREÇÃO: Se não houver nenhum separador comum, tentamos dividir pelo tamanho do cabeçalho original, mas isso é muito arriscado. 
+                 // Vamos forçar que o cabeçalho seja limpo e que o separador padrão seja a tabulação, pois é o esperado de um dump de planilha.
+            }
+            
+            const rawHeaders = lines[0].split(separator).map(h => h.trim()).filter(h => h.length > 0);
             const data = [];
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(separator).map(v => v.trim());
-                if (values.length === rawHeaders.length && values.some(v => v !== '')) {
+                if (values.length >= rawHeaders.length && values.some(v => v !== '')) {
                     const item = {};
                     rawHeaders.forEach((header, index) => {
-                        item[header] = values[index];
+                        // Garante que se o valor estiver faltando, ele seja uma string vazia, não undefined
+                        item[header] = values[index] !== undefined ? values[index] : '';
                     });
                     data.push(item);
                 }
@@ -1168,9 +1188,29 @@
         }
 
         function findColumn(headers, key) {
+             // Normaliza a chave buscada para comparação
              const normalizedKey = normalizeString(key);
-             // Busca a coluna que contenha a palavra-chave normalizada (mais robusto)
-             return headers.find(h => normalizeString(h).includes(normalizedKey));
+             
+             // 1. Tenta encontrar a chave exata (mesmo com case-insensibilidade/acentos)
+             let found = headers.find(h => normalizeString(h) === normalizedKey);
+             if (found) return found;
+             
+             // 2. Se não encontrou, busca a coluna que contenha a palavra-chave (mais robusto)
+             found = headers.find(h => normalizeString(h).includes(normalizedKey));
+             if (found) return found;
+             
+             // 3. Busca a chave que o usuário pode ter colado de forma compacta (ex: 'Localizacao' em 'TipoTombamentoLocalizacao')
+             // Esta é uma busca arriscada, mas necessária para dados mal formatados
+             if (normalizedKey.length > 0) {
+                for (const header of headers) {
+                    const normalizedHeader = normalizeString(header);
+                    if (normalizedHeader.includes(normalizedKey)) {
+                         return header;
+                    }
+                }
+             }
+
+             return null;
         }
 
         // Processa dados e aplica Vinculação de Local (REQ 1)
@@ -1196,10 +1236,10 @@
             const sisStateCol = findColumn(sisHeader, COLUMNS.SIS.STATE); 
             
             // 1. Validação de Colunas
-            if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' não encontrada no Inventário. Verifique o cabeçalho.");
-            if (globalInventarioData.length > 0 && !invIdCol) throw new Error("Coluna 'Tombo' (Inventário) não encontrada. Verifique o cabeçalho.");
-            if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' ou 'Local' não encontrada no Sistema. Verifique o cabeçalho.");
-            if (globalSistemaData.length > 0 && !sisIdCol) throw new Error("Coluna 'Tombamento' (Sistema) não encontrada. Verifique o cabeçalho.");
+            if (globalInventarioData.length > 0 && !invLocalCol) throw new Error(`Coluna 'Local' (${COLUMNS.INV.LOCAL}) não encontrada no Inventário. Cabeçalhos encontrados: [${invHeader.join(', ')}]`);
+            if (globalInventarioData.length > 0 && !invIdCol) throw new Error(`Coluna 'Tombo' (${COLUMNS.INV.ID}) não encontrada no Inventário. Cabeçalhos encontrados: [${invHeader.join(', ')}]`);
+            if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error(`Coluna 'Localização' (${COLUMNS.SIS.LOCAL}) não encontrada no Sistema. Cabeçalhos encontrados: [${sisHeader.join(', ')}]`);
+            if (globalSistemaData.length > 0 && !sisIdCol) throw new Error(`Coluna 'Tombamento' (${COLUMNS.SIS.ID}) não encontrada no Sistema. Cabeçalhos encontrados: [${sisHeader.join(', ')}]`);
 
 
             // 2. Pré-coleta de Locais Únicos (para o Modal de Local Linking)
