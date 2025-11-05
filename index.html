@@ -1131,6 +1131,14 @@
             const grouped = new Map();
             items.forEach(item => {
                 const itemId = item.itemId; 
+                
+                // CORREÇÃO: IGNORA IDS 'S/T' ou vazios para a contagem de DUPLICIDADE
+                if (normalizeString(itemId) === 's t' || normalizeString(itemId) === '') {
+                    // Para fins de agrupamento, itens S/T são contados separadamente
+                    // mas não disparam o alerta de DUPLICIDADE, pois não são IDs formais.
+                    // Mantemos o valor original para que a contagem Qtd seja correta.
+                }
+
                 grouped.set(itemId, (grouped.get(itemId) || 0) + 1);
             });
             return grouped;
@@ -1344,6 +1352,15 @@
 
                 let hasQuantityDivergence = diff !== 0;
                 let hasTombamentoDivergence = false;
+
+                // CRITICAL FIX: Filtra IDs "S/T" ou vazios da verificação de duplicidade de Tombo.
+                const invIdsForCheck = new Set(invData.items
+                    .map(i => normalizeString(i.itemId))
+                    .filter(id => id !== 's t' && id !== ''));
+                const sisIdsForCheck = new Set(sisData.items
+                    .map(i => normalizeString(i.itemId))
+                    .filter(id => id !== 's t' && id !== ''));
+
 
                 const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
                 const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
@@ -1817,9 +1834,14 @@
                     }
                     
                     // REQ 2: Lógica de exibição da quantidade (ID Único vs Duplicidade)
-                    const badgeText = totalQty > 1 
+                    // CORRIGIDO: Só verifica duplicidade se o ID não for S/T ou vazio
+                    const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
+                    const badgeText = (totalQty > 1 && !isST)
                         ? `⚠️ DUPLICIDADE DE TOMBO (Qtd: ${totalQty})` 
+                        : (isST)
+                        ? `⚠️ SEM ID (Qtd: ${totalQty})`
                         : `⚠️ A VINCULAR (ID Único)`;
+
 
                     li.innerHTML = `
                         <div class="flex items-center gap-3 mb-2">
@@ -1853,8 +1875,12 @@
                     }
                     
                     // REQ 2: Lógica de exibição da quantidade (ID Único vs Duplicidade)
-                    const badgeText = totalQty > 1 
+                    // CORRIGIDO: Só verifica duplicidade se o ID não for S/T ou vazio
+                    const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
+                    const badgeText = (totalQty > 1 && !isST)
                         ? `⚠️ DUPLICIDADE DE TOMBO (Qtd: ${totalQty})` 
+                        : (isST)
+                        ? `⚠️ SEM ID (Qtd: ${totalQty})`
                         : `⚠️ A VINCULAR (ID Único)`;
 
                     li.innerHTML = `
