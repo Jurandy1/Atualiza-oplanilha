@@ -1028,12 +1028,12 @@
         
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
-            // APLICA TRIM e remove acentos e caracteres especiais, e substitui espaços por um único espaço
+            // APLICA TRIM e remove acentos e substitui pontuações por espaço, e espaços múltiplos por um único espaço
             return str
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[-/.,;:()]/g, ' ')
+                .replace(/[-/.,;:()]/g, ' ') // Substitui pontuações por espaço
                 .replace(/\s+/g, ' ')
                 .trim(); // Garante que não há espaços iniciais/finais após a limpeza
         }
@@ -1241,6 +1241,7 @@
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                 const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                // CRIA A CHAVE NORMALIZADA (UNIFICANDO AS DUPLICAÇÕES)
                 const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                 if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
                     allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
@@ -1249,6 +1250,7 @@
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? (item[sisUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                 const local = sisLocalCol ? (item[sisLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                 // CRIA A CHAVE NORMALIZADA (UNIFICANDO AS DUPLICAÇÕES)
                 const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                 if (local !== 'Sem Local' && !allUniqueLocations.sis.has(key)) {
                     allUniqueLocations.sis.set(key, { unit: unidade, local: local, key: key });
