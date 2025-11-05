@@ -1209,7 +1209,7 @@
                 const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                 const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
                 const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
-                if (!allUniqueLocations.inv.has(key)) {
+                if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
                     allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
                 }
             });
@@ -1217,7 +1217,7 @@
                 const unidade = sisUnitCol ? (item[sisUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                 const local = sisLocalCol ? (item[sisLocalCol] || 'Sem Local').trim() : 'Sem Local';
                 const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
-                if (!allUniqueLocations.sis.has(key)) {
+                if (local !== 'Sem Local' && !allUniqueLocations.sis.has(key)) {
                     allUniqueLocations.sis.set(key, { unit: unidade, local: local, key: key });
                 }
             });
@@ -1928,16 +1928,18 @@
             // Popula o filtro de unidades para o modal de Vinculação
             const unitFilter = document.getElementById('local-unit-filter');
             unitFilter.innerHTML = '<option value="none">Selecione a Unidade</option>';
-            const units = new Set();
-            allUniqueLocations.inv.forEach(loc => units.add(loc.unit));
-            allUniqueLocations.sis.forEach(loc => units.add(loc.unit));
+            const unitsMap = new Map();
+            allUniqueLocations.inv.forEach(loc => unitsMap.set(normalizeString(loc.unit), loc.unit));
+            allUniqueLocations.sis.forEach(loc => unitsMap.set(normalizeString(loc.unit), loc.unit));
             
-            [...units].sort().forEach(unit => {
-                if (unit !== 'Sem Unidade') {
+            [...unitsMap.keys()].sort().forEach(normUnit => {
+                if (normUnit !== 'sem unidade') {
                     const option = document.createElement('option');
-                    // CORREÇÃO: Usando a versão normalizada do nome da unidade como value
-                    option.value = normalizeString(unit); 
-                    option.textContent = `🏢 ${unit}`;
+                    // O TEXTO visível será o nome original (melhor guess) e o VALUE será o nome normalizado (chave de busca)
+                    const originalUnitName = unitsMap.get(normUnit);
+                    
+                    option.value = normUnit; // O VALOR é a chave normalizada
+                    option.textContent = `🏢 ${originalUnitName}`;
                     unitFilter.appendChild(option);
                 }
             });
