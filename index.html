@@ -720,7 +720,7 @@
 
     <!-- MODAL RELATÓRIO FINAL -->
     <div id="final-report-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeFinalReport()">
-        <div class="modal-content bg-white w-full max-w-6xl rounded-2xl shadow-2xl transform scale-95 max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="modal-content bg-white w-full max-w-6xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b-2 border-purple-200 p-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-2xl">
                 <div>
                     <h2 class="text-3xl font-bold">📋 Relatório Final por Unidade</h2>
@@ -747,14 +747,14 @@
         </div>
     </div>
 
-    <!-- MODAL DE LOCAL LINKING -->
+    <!-- MODAL DE LOCAL LINKING (REQ 1 - MODO AUDITORIA) -->
      <div id="local-linking-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeLocalLinkingModal()">
         <div class="modal-content bg-white w-full max-w-4xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
             <!-- Header -->
             <div class="flex justify-between items-center border-b-2 border-gray-200 p-6 bg-gradient-to-r from-inventario to-blue-700 text-white rounded-t-2xl">
                 <div>
-                    <h2 class="text-3xl font-bold">🗺️ Vinculação de Local</h2>
-                    <p class="text-blue-100 mt-1">Auditoria de Local: Confirme ou corrija o mapeamento entre locais de diferentes bases.</p>
+                    <h2 class="text-3xl font-bold">🗺️ Auditoria de Local (Garantia)</h2>
+                    <p class="text-blue-100 mt-1">Confirme ou corrija o mapeamento entre locais de diferentes bases.</p>
                 </div>
                 <button onclick="closeLocalLinkingModal()" class="text-white hover:text-gray-200 text-4xl transition-colors">
                     &times;
@@ -764,7 +764,7 @@
             <!-- Filtro de Unidade (REQ 1) -->
             <div class="px-6 pt-4 pb-2">
                 <label for="local-unit-filter" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                    🏢 Filtrar por Unidade
+                    🏢 Selecione a Unidade para Auditar
                 </label>
                 <select 
                     id="local-unit-filter" 
@@ -861,6 +861,7 @@
         let locationLinkingMode = false;
         let currentAuditedInvKey = null; // Apenas o local do Inventário sendo auditado
         let allUniqueLocations = { inv: new Map(), sis: new Map() }; // Mapa global de todos os locais únicos para o modal
+        let autoMapSuggestions = new Map(); // Cache para sugestões de auto-map
 
         // Cabeçalhos de exportação final (definidos pelo usuário)
         const FINAL_HEADERS = ['Tipo', 'Tombamento', 'Descrição', 'Unidade', 'Quantidade', 'Localização', 'Estado', 'Origem da Doação', 'Observação', 'Fornecedor'];
@@ -1578,6 +1579,29 @@
             }
         }
 
+        function openModal(compositeKey) {
+            const details = discrepancyDetails.get(compositeKey);
+            if (!details) return;
+
+            currentModalData = details;
+            currentCompositeKey = compositeKey;
+
+            const modal = document.getElementById('item-details-modal');
+            const modalContent = modal.querySelector('.modal-content');
+
+            document.getElementById('modal-title').textContent = `📍 ${details.local}`;
+            document.getElementById('modal-search').value = '';
+            
+            renderModalLists(details.invItems, details.sisItems);
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
         // Renderiza listas filtrando itens vinculados (sumir) e atualiza subtítulo
         function renderModalLists(rawInvItems, rawSisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
@@ -1747,7 +1771,324 @@
             }, 300);
         }
 
+        // === VINCULAÇÃO DE LOCAL (REQ 1 - MODO AUDITORIA) ===
+
+        // BUGFIX: Pré-processa os locais antes de abrir o modal
+        async function toggleLocalLinkingMode() {
+            // 1. Carrega os dados das textareas
+            globalInventarioData = parseData(document.getElementById('list-inventario').value);
+            globalSistemaData = parseData(document.getElementById('list-sistema').value);
+
+            if (globalInventarioData.length === 0 && globalSistemaData.length === 0) {
+                showCustomAlert("⚠️ Por favor, cole os dados do Inventário e Sistema antes de vincular locais.");
+                return;
+            }
+
+            try {
+                // 2. Re-popula allUniqueLocations (lógica que também existe em processAuditData)
+                allUniqueLocations = { inv: new Map(), sis: new Map() };
+                
+                const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
+                const sisHeader = globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : [];
+                
+                const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
+                const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
+                const sisUnitCol = findColumn(sisHeader, COLUMNS.SIS.UNIT);
+                const sisLocalCol = findColumn(sisHeader, COLUMNS.SIS.LOCAL);
+
+                // Validação
+                if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' (Inventário) não encontrada.");
+                if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' (Sistema) não encontrada.");
+
+                globalInventarioData.forEach(item => {
+                    const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
+                    const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                    if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
+                        allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
+                    }
+                });
+                globalSistemaData.forEach(item => {
+                    const unidade = sisUnitCol ? (item[sisUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
+                    const local = sisLocalCol ? (item[sisLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                    if (local !== 'Sem Local' && !allUniqueLocations.sis.has(key)) {
+                        allUniqueLocations.sis.set(key, { unit: unidade, local: local, key: key });
+                    }
+                });
+
+            } catch (error) {
+                showCustomAlert(`❌ Erro ao pré-processar locais: ${error.message}`);
+                return;
+            }
+
+            // 3. Inicializa e popula o modal
+            setupLocalLinkingModal('none'); // Chama com 'none' para popular o filtro de unidade
+            
+            const modal = document.getElementById('local-linking-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            locationLinkingMode = true; // Ativa modo
+            currentAuditedInvKey = null;
+            document.getElementById('local-unit-filter').value = 'none'; // Reseta o filtro
+
+            // Popula o filtro de unidades para o modal de Vinculação
+            const unitFilter = document.getElementById('local-unit-filter');
+            unitFilter.innerHTML = '<option value="none">Selecione a Unidade</option>';
+            const units = new Set();
+            allUniqueLocations.inv.forEach(loc => units.add(loc.unit));
+            allUniqueLocations.sis.forEach(loc => units.add(loc.unit));
+            
+            [...units].sort().forEach(unit => {
+                if (unit !== 'Sem Unidade') {
+                    const option = document.createElement('option');
+                    option.value = unit;
+                    option.textContent = `🏢 ${unit}`;
+                    unitFilter.appendChild(option);
+                }
+            });
+
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        // REQ 1: Popula o modal de auditoria de local
+        function setupLocalLinkingModal(selectedUnit) {
+            const invList = document.getElementById('local-inv-list');
+            const sisList = document.getElementById('local-sis-list');
+            const unitFilter = document.getElementById('local-unit-filter');
+            autoMapSuggestions = new Map();
+            
+            if (selectedUnit === 'none') {
+                invList.innerHTML = '<li class="text-gray-500 italic p-3">Selecione uma unidade para carregar os locais.</li>';
+                sisList.innerHTML = '<li class="text-gray-500 italic p-3">Selecione uma unidade.</li>';
+                return;
+            }
+            
+            invList.innerHTML = '';
+            sisList.innerHTML = '';
+            currentAuditedInvKey = null;
+            document.getElementById('current-local-status').textContent = 'Selecione um local do Inventário para auditar.';
+            document.getElementById('btn-confirm-local').disabled = true;
+            document.getElementById('btn-remove-local').disabled = true;
+
+
+            // 2. Filtra locais pela unidade selecionada
+            const normalizedUnit = normalizeString(selectedUnit);
+            const filteredInv = [...allUniqueLocations.inv.values()]
+                .filter(loc => normalizeString(loc.unit) === normalizedUnit)
+                .sort((a, b) => a.local.localeCompare(b.local));
+                
+            const filteredSis = [...allUniqueLocations.sis.values()]
+                .filter(loc => normalizeString(loc.unit) === normalizedUnit)
+                .sort((a, b) => a.local.localeCompare(b.local));
+            
+            // 3. Auto-mapeamento (sugestão)
+            autoMapSuggestions = autoMapLocations(filteredInv, filteredSis);
+
+            // 4. Renderiza lista de Inventário (Origem)
+            if (filteredInv.length === 0) {
+                 invList.innerHTML = '<li class="text-gray-500 italic p-3">Nenhum local de inventário encontrado para esta unidade.</li>';
+            } else {
+                filteredInv.forEach(loc => {
+                    const li = document.createElement('li');
+                    li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer location-link-mode`;
+                    li.setAttribute('onclick', `selectLocalForAuditing(event, '${loc.key.replace(/'/g, "\\'")}')`);
+                    li.dataset.key = loc.key; 
+                    
+                    const linkedSisKey = locationLinks.get(loc.key);
+                    const suggestedSisKey = autoMapSuggestions.get(loc.key);
+                    let badge = '';
+
+                    if (linkedSisKey) {
+                        const targetName = allUniqueLocations.sis.get(linkedSisKey)?.local || 'Desconhecido';
+                        badge = `<span class="link-badge ml-2">🔗 VINCULADO a: ${targetName}</span>`;
+                        li.classList.add('item-linked');
+                    } else if (suggestedSisKey) {
+                         const targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
+                         badge = `<span class="status-badge bg-yellow-200 text-yellow-800 ml-2">Sugestão: ${targetName}</span>`;
+                    } else {
+                         badge = `<span class="status-badge bg-gray-200 text-gray-700 ml-2">Sem Vínculo</span>`;
+                    }
+                    
+                    li.innerHTML = `
+                        <div class="font-semibold">${loc.local}</div>
+                        <div class="text-xs text-gray-500">🏢 ${loc.unit} ${badge}</div>
+                    `;
+                    invList.appendChild(li);
+                });
+            }
+
+            // 5. Renderiza lista de Sistema (Destino)
+             if (filteredSis.length === 0) {
+                 sisList.innerHTML = '<li class="text-gray-500 italic p-3">Nenhum local de sistema encontrado para esta unidade.</li>';
+            } else {
+                filteredSis.forEach(loc => {
+                    const li = document.createElement('li');
+                    li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer`;
+                    li.setAttribute('onclick', `selectLocalForMapping(event, '${loc.key.replace(/'/g, "\\'")}')`);
+                    li.dataset.key = loc.key; 
+                    
+                    li.innerHTML = `
+                        <div class="font-semibold">${loc.local}</div>
+                        <div class="text-xs text-gray-500">🏢 ${loc.unit}</div>
+                    `;
+                    sisList.appendChild(li);
+                });
+            }
+        }
+
+        // Tenta encontrar a melhor correspondência
+        function autoMapLocations(invLocs, sisLocs) {
+            const suggestions = new Map();
+            const sisNormMap = new Map(sisLocs.map(loc => [normalizeString(loc.local), loc.key]));
+
+            invLocs.forEach(invLoc => {
+                const normInv = normalizeString(invLoc.local);
+                if (sisNormMap.has(normInv)) {
+                    // Mapeamento exato (sugestão forte)
+                    suggestions.set(invLoc.key, sisNormMap.get(normInv));
+                }
+            });
+            return suggestions;
+        }
+
+        // REQ 1: Clica no local do Inventário (Esquerda) para auditar
+        function selectLocalForAuditing(event, invKey) {
+            currentAuditedInvKey = invKey;
+            
+            // 1. Remove seleção anterior de AMBAS as listas
+            document.querySelectorAll('#local-linking-modal .location-selected').forEach(el => el.classList.remove('location-selected'));
+            
+            // 2. Seleciona o item do inventário
+            const invLi = event.target.closest('li');
+            invLi.classList.add('location-selected');
+
+            const statusText = document.getElementById('current-local-status');
+            const btnConfirm = document.getElementById('btn-confirm-local');
+            const btnRemove = document.getElementById('btn-remove-local');
+
+            const invLoc = allUniqueLocations.inv.get(invKey);
+            statusText.textContent = `Auditando: ${invLoc.local}`;
+            
+            // 3. Habilita botões
+            btnConfirm.disabled = false;
+            btnRemove.disabled = !locationLinks.has(invKey); // Só remove se já houver um link salvo
+
+            // 4. Tenta destacar a sugestão ou o link salvo no Sistema (Direita)
+            const linkedSisKey = locationLinks.get(invKey) || autoMapSuggestions.get(invKey);
+            
+            if (linkedSisKey) {
+                const sisLi = document.querySelector(`#local-sis-list li[data-key="${linkedSisKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`);
+                if (sisLi) {
+                    sisLi.classList.add('location-selected');
+                }
+            }
+        }
+        
+        // REQ 1: Clica no local do Sistema (Direita) para mapear
+        function selectLocalForMapping(event, sisKey) {
+             const sisLi = event.target.closest('li');
+             
+             // Só permite seleção se um local de inventário estiver sendo auditado
+             if (!currentAuditedInvKey) return; 
+
+             // Remove seleção anterior (apenas na lista do sistema)
+             document.querySelectorAll('#local-sis-list .location-selected').forEach(el => el.classList.remove('location-selected'));
+             
+             sisLi.classList.add('location-selected');
+
+            // Atualiza o status
+            const statusText = document.getElementById('current-local-status');
+            const invLoc = allUniqueLocations.inv.get(currentAuditedInvKey);
+            const sisLoc = allUniqueLocations.sis.get(sisKey);
+            statusText.textContent = `Pronto para VINCULAR: ${invLoc.local} ➔ ${sisLoc.local}`;
+        }
+
+        // REQ 1: Confirma o vínculo (clicando no botão "Confirmar")
+        function confirmLocalLink() {
+            if (!currentAuditedInvKey) {
+                showCustomAlert("⚠️ Selecione um local do Inventário primeiro.");
+                return;
+            }
+            
+            const selectedSisElement = document.querySelector('#local-sis-list .location-selected');
+            const sisKeyToLink = selectedSisElement ? selectedSisElement.dataset.key : null;
+
+            if (!sisKeyToLink) {
+                 showCustomAlert("⚠️ Selecione um local do Sistema (destino) para vincular.");
+                 return;
+            }
+
+            createLocationLink(currentAuditedInvKey, sisKeyToLink);
+        }
+
+        function createLocationLink(invKey, sisKey) {
+            locationLinks.set(invKey, sisKey);
+            saveLinksToStorage();
+            
+            const invLoc = allUniqueLocations.inv.get(invKey);
+            const sisLoc = allUniqueLocations.sis.get(sisKey);
+            
+            showCustomAlert(`✅ Vínculo de Local criado/confirmado!\n📋 ${invLoc.local} ➔ ⚙️ ${sisLoc.local}`);
+            
+            // Atualiza a lista no modal para refletir o novo link
+            setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
+            // Reseta o painel de status
+            currentAuditedInvKey = null;
+            document.getElementById('current-local-status').textContent = 'Selecione um local do Inventário para auditar.';
+            document.getElementById('btn-confirm-local').disabled = true;
+            document.getElementById('btn-remove-local').disabled = true;
+        }
+
+        // REQ 1: Remove o vínculo
+        function removeLocalLink() {
+            if (!currentAuditedInvKey) {
+                showCustomAlert("⚠️ Selecione um local do Inventário primeiro.");
+                return;
+            }
+
+            if (!locationLinks.has(currentAuditedInvKey)) {
+                 showCustomAlert("ℹ️ Este local não possui vínculo salvo para remover.");
+                 return;
+            }
+
+            locationLinks.delete(currentAuditedInvKey);
+            saveLinksToStorage();
+            
+            const invLoc = allUniqueLocations.inv.get(currentAuditedInvKey);
+            showCustomAlert(`✅ Vínculo removido para: ${invLoc.local}`);
+
+            // Atualiza a lista no modal
+            setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
+            // Reseta o painel de status
+            currentAuditedInvKey = null;
+            document.getElementById('current-local-status').textContent = 'Selecione um local do Inventário para auditar.';
+            document.getElementById('btn-confirm-local').disabled = true;
+            document.getElementById('btn-remove-local').disabled = true;
+        }
+
+        function closeLocalLinkingModal() {
+            currentAuditedInvKey = null;
+            const modal = document.getElementById('local-linking-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+        
         // === GERENCIADOR DE LINKS ===
+
         function toggleLinkManager() {
             const modal = document.getElementById('link-manager-modal');
             const modalContent = modal.querySelector('.modal-content');
@@ -1804,7 +2145,7 @@
                                 <span class="mx-1 text-purple-600">🔗</span>
                                 <span class="font-semibold text-orange-700">Sis Tombamento: ${sysItem}</span>
                             </div>
-                            <button onclick="removeLink('${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
+                            <button onclick="removeLink('item|${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
                                 🗑️
                             </button>
                         `;
@@ -1840,501 +2181,6 @@
             }
             
             updateLinkCount();
-        }
-
-        function exportLinks() {
-            const data = {
-                itemLinks: {},
-                locationLinks: Object.fromEntries(locationLinks)
-            };
-            itemLinks.forEach((value, key) => {
-                data.itemLinks[key] = Object.fromEntries(value);
-            });
-            
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `vinculos_${new Date().toISOString().slice(0,10)}.json`;
-            link.click();
-        }
-
-        function importLinks() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        if (data.itemLinks) {
-                             itemLinks = new Map(Object.entries(data.itemLinks).map(([key, val]) => [key, new Map(Object.entries(val))]));
-                        }
-                        if (data.locationLinks) {
-                             locationLinks = new Map(Object.entries(data.locationLinks));
-                        }
-                        saveLinksToStorage();
-                        showCustomAlert('✅ Vinculações importadas com sucesso!');
-                    } catch (error) {
-                        showCustomAlert('❌ Erro ao importar arquivo');
-                    }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
-
-        // === RELATÓRIO FINAL ===
-        
-        function generateFinalReport() {
-            const modal = document.getElementById('final-report-modal');
-            const modalContent = modal.querySelector('.modal-content');
-            const content = document.getElementById('final-report-content');
-            
-            content.innerHTML = '<p class="text-center p-8">Gerando relatório...</p>';
-            
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-                modalContent.classList.add('scale-100');
-                
-                setTimeout(() => {
-                    const reportHTML = buildFinalReport();
-                    content.innerHTML = reportHTML;
-                }, 100);
-            }, 10);
-        }
-
-        // Novo: Constrói o relatório final com todos os campos e lida com Tombamento
-        function buildFinalReport() {
-            const unitReport = new Map();
-            
-            // Mapeia todas as linhas completas do Inventário e Sistema por ItemID (Tombo/Tombamento)
-            const allInvItems = new Map(); // Map<itemId, Array<{itemId, data}>>
-            const allSisItems = new Map();
-            
-            globalInventarioData.forEach(item => {
-                const itemId = item[findColumn(Object.keys(item), COLUMNS.INV.ID)];
-                if (itemId) {
-                    if (!allInvItems.has(itemId)) allInvItems.set(itemId, []);
-                    allInvItems.get(itemId).push({ itemId, data: item });
-                }
-            });
-
-            globalSistemaData.forEach(item => {
-                const itemId = item[findColumn(Object.keys(item), COLUMNS.SIS.ID)];
-                if (itemId) {
-                    if (!allSisItems.has(itemId)) allSisItems.set(itemId, []);
-                    allSisItems.get(itemId).push({ itemId, data: item });
-                }
-            });
-
-
-            // Itera sobre as discrepâncias (locais)
-            discrepancyDetails.forEach((details, compositeKey) => {
-                
-                const locationItemLinks = itemLinks.get(compositeKey) || new Map();
-                
-                const invMap = groupItems(details.invItems); // Map<itemId, qty>
-                const sisMap = groupItems(details.sisItems); // Map<itemId, qty>
-                
-                const missing = [];
-                const extra = [];
-                
-                const processedSysIds = new Set();
-                
-                // 1. Processa Itens do Inventário (o que deveria estar lá)
-                invMap.forEach((invQty, invId) => {
-                    const linkedSysId = locationItemLinks.get(invId);
-                    
-                    if (linkedSysId) {
-                        processedSysIds.add(linkedSysId);
-                        const sisQty = sisMap.get(linkedSysId) || 0;
-                        const diff = invQty - sisQty;
-                        
-                        // Se Inventário tem mais do que Sistema (após vínculo)
-                        if (diff > 0) {
-                            // Faltando diff itens do SISTEMA (para o ID vinculado)
-                            // A lista Missing deve se basear nos dados do Inventário
-                            const invItemData = details.invItems.find(i => i.itemId === invId);
-                            if (invItemData) {
-                                for(let i = 0; i < diff; i++) {
-                                     missing.push({ ...invItemData, type: 'Missing_Linked', qty: 1, linkedTo: linkedSysId });
-                                }
-                            }
-                        } 
-                        // Se Sistema tem mais do que Inventário (após vínculo) - tratado em 2.
-                    } else {
-                        // Item NÃO VINCULADO (pode ser discrepância de QTD, Tombo ou Só Inventário)
-                        const sisQty = sisMap.get(invId) || 0;
-                        const diff = invQty - sisQty;
-                        
-                        if (diff > 0) {
-                            // Faltando diff itens do SISTEMA (para o ID não vinculado)
-                            const invItemData = details.invItems.find(i => i.itemId === invId);
-                            if (invItemData) {
-                                for(let i = 0; i < diff; i++) {
-                                    missing.push({ ...invItemData, type: 'Missing_Unlinked', qty: 1 });
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                // 2. Processa Itens do Sistema (o que sobrou)
-                sisMap.forEach((sisQty, sisId) => {
-                    const invQty = invMap.get(sisId) || 0;
-                    
-                    if (processedSysIds.has(sisId)) {
-                        // Item foi vinculado. Checa se sobrou no Sistema.
-                        let linkedInvId = Array.from(locationItemLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
-
-                        const originalInvQty = invMap.get(linkedInvId) || 0;
-                        const diff = sisQty - originalInvQty; // Sis - Inv
-                        
-                        if (diff > 0) {
-                            // Sobrando diff itens no SISTEMA (após vínculo)
-                            const sisItemData = details.sisItems.find(i => i.itemId === sisId);
-                            if (sisItemData) {
-                                for(let i = 0; i < diff; i++) {
-                                     extra.push({ ...sisItemData, type: 'Extra_Linked', qty: 1, linkedFrom: linkedInvId });
-                                }
-                            }
-                        }
-                    } else if (Array.from(locationItemLinks.values()).includes(sisId)) {
-                        // Se esse sisId é o TARGET de um link, já foi tratado pelo invMap
-                        return;
-                    } else {
-                        // Item NÃO VINCULADO e Sobrando
-                        const diff = sisQty - invQty; // Sis - Inv
-                        
-                        if (diff > 0) {
-                            // Sobrando diff itens no SISTEMA (não vinculado)
-                            const sisItemData = details.sisItems.find(i => i.itemId === sisId);
-                            if (sisItemData) {
-                                for(let i = 0; i < diff; i++) {
-                                    extra.push({ ...sisItemData, type: 'Extra_Unlinked', qty: 1 });
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                if (missing.length > 0 || extra.length > 0) {
-                    if (!unitReport.has(details.unidade)) {
-                        unitReport.set(details.unidade, []);
-                    }
-                    unitReport.get(details.unidade).push({
-                        local: details.local,
-                        missing,
-                        extra
-                    });
-                }
-            });
-            
-            // Gera HTML
-            let html = '';
-            
-            if (unitReport.size === 0) {
-                return '<div class="text-center p-8 bg-green-50 rounded-xl"><p class="text-2xl mb-2">🎉</p><p class="text-lg font-bold text-green-700">Tudo está correto!</p><p class="text-gray-600">Não há itens faltantes após as vinculações</p></div>';
-            }
-            
-            unitReport.forEach((locations, unidade) => {
-                html += `
-                    <div class="mb-8">
-                        <h3 class="text-2xl font-bold text-purple-800 mb-4 pb-2 border-b-2 border-purple-300">
-                            🏢 ${unidade}
-                        </h3>
-                `;
-                
-                locations.forEach(location => {
-                    html += `
-                        <div class="mb-6 p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
-                            <h4 class="font-bold text-lg text-gray-800 mb-3">📍 ${location.local}</h4>
-                    `;
-                    
-                    if (location.missing.length > 0) {
-                        // Tabela para ITENS FALTANTES (devem ser adicionados ao sistema, logo, dados do Inventário)
-                        html += `
-                            <div class="mb-4 overflow-x-auto custom-scrollbar">
-                                <p class="font-bold text-red-700 mb-2">⚠️ FALTANDO (adicionar ao sistema):</p>
-                                <table class="report-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Tipo</th>
-                                            <th>Tombamento</th>
-                                            <th>Descrição</th>
-                                            <th>Unidade</th>
-                                            <th>Localização</th>
-                                            <th>Estado</th>
-                                            <th>Origem da Doação</th>
-                                            <th>Observação</th>
-                                            <th>Fornecedor</th>
-                                            <th>Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                        `;
-                        location.missing.forEach(item => {
-                            // Usa a data (linha completa) do item do Inventário
-                            const row = item.data; 
-                            html += `
-                                <tr>
-                                    <td>${row['Tipo'] || '-'}</td>
-                                    <td class="font-medium">${row['Tombo'] || item.itemId}</td>
-                                    <td>${row['Item'] || '-'}</td>
-                                    <td>${row['Unidade'] || '-'}</td>
-                                    <td>${row['Local'] || '-'}</td>
-                                    <td>${row['Estado'] || '-'}</td>
-                                    <td>${row['Origem da Doação'] || '-'}</td>
-                                    <td>${row['Observação'] || '-'}</td>
-                                    <td>${row['Fornecedor'] || '-'}</td>
-                                    <td class="text-red-600 font-bold">${item.linkedTo ? `LIGAR AO ID ${item.linkedTo}` : 'INSERIR NO SIS.'}</td>
-                                </tr>
-                            `;
-                        });
-                        html += `
-                                    </tbody>
-                                </table>
-                            </div>
-                        `;
-                    }
-                    
-                    if (location.extra.length > 0) {
-                        // Tabela para ITENS SOBRANDO (devem ser removidos do sistema, logo, dados do Sistema)
-                        html += `
-                            <div>
-                                <p class="font-bold text-orange-700 mb-2">📦 SOBRANDO (remover do sistema):</p>
-                                <table class="report-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Tipo</th>
-                                            <th>Tombamento</th>
-                                            <th>Descrição</th>
-                                            <th>Unidade</th>
-                                            <th>Localização</th>
-                                            <th>Estado</th>
-                                            <th>Origem da Doação</th>
-                                            <th>Observação</th>
-                                            <th>Fornecedor</th>
-                                            <th>Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                        `;
-                        location.extra.forEach(item => {
-                            // Usa a data (linha completa) do item do Sistema
-                            const row = item.data;
-                            html += `
-                                <tr>
-                                    <td>${row['Tipo'] || '-'}</td>
-                                    <td class="font-medium">${row['Tombamento'] || item.itemId}</td>
-                                    <td>${row['Descrição'] || '-'}</td>
-                                    <td>${row['Unidade'] || '-'}</td>
-                                    <td>${row['Localização'] || '-'}</td>
-                                    <td>${row['Estado'] || '-'}</td>
-                                    <td>${row['Origem da Doação'] || '-'}</td>
-                                    <td>${row['Observação'] || '-'}</td>
-                                    <td>${row['Fornecedor'] || '-'}</td>
-                                    <td class="text-orange-600 font-bold">${item.linkedFrom ? `DESLIGAR DO ID ${item.linkedFrom}` : 'REMOVER DO SIS.'}</td>
-                                </tr>
-                            `;
-                        });
-                        html += `
-                                    </tbody>
-                                </table>
-                            </div>
-                        `;
-                    }
-                    
-                    html += `</div>`;
-                });
-                
-                html += `</div>`;
-            });
-            
-            return html;
-        }
-
-        function closeFinalReport() {
-            const modal = document.getElementById('final-report-modal');
-            const modalContent = modal.querySelector('.modal-content');
-            
-            modal.classList.add('opacity-0');
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        }
-
-        // Exporta CSV com os cabeçalhos solicitados
-        function exportFinalReport() {
-            const reportData = [];
-
-            discrepancyDetails.forEach((details, compositeKey) => {
-                const locationItemLinks = itemLinks.get(compositeKey) || new Map();
-                const invMap = groupItems(details.invItems);
-                const sisMap = groupItems(details.sisItems);
-                
-                const tempInvMap = new Map(invMap);
-                const tempSisMap = new Map(sisMap);
-                
-                // 1. Processa Links para subtrair quantidades
-                locationItemLinks.forEach((sysId, invId) => {
-                    const invQty = tempInvMap.get(invId) || 0;
-                    const sisQty = tempSisMap.get(sysId) || 0;
-                    const consumed = Math.min(invQty, sisQty);
-                    if (consumed > 0) {
-                        tempInvMap.set(invId, invQty - consumed);
-                        tempSisMap.set(sysId, sisQty - consumed);
-                    }
-                });
-
-                // 2. Coleta ITENS FALTANTES (dados do Inventário)
-                tempInvMap.forEach((qty, invId) => {
-                    if (qty > 0) {
-                        const invItemData = details.invItems.find(i => i.itemId === invId).data;
-                        const linkedTo = locationItemLinks.get(invId);
-                        
-                        for (let i = 0; i < qty; i++) {
-                            const row = {
-                                'Tipo': invItemData['Tipo'] || '',
-                                'Tombamento': invItemData['Tombo'] || invId,
-                                'Descrição': invItemData['Item'] || '',
-                                'Unidade': invItemData['Unidade'] || details.unidade,
-                                'Quantidade': 1,
-                                'Localização': invItemData['Local'] || details.local,
-                                'Estado': invItemData['Estado'] || '',
-                                'Origem da Doação': invItemData['Origem da Doação'] || '',
-                                'Observação': invItemData['Observação'] || '',
-                                'Fornecedor': invItemData['Fornecedor'] || '',
-                                'Ação': linkedTo ? `LIGAR AO ID ${linkedTo}` : 'INSERIR NO SIS.',
-                                'Local_Composto': compositeKey 
-                            };
-                            reportData.push(row);
-                        }
-                    }
-                });
-
-                // 3. Coleta ITENS SOBRANDO (dados do Sistema)
-                tempSisMap.forEach((qty, sisId) => {
-                    if (qty > 0) {
-                        const sisItemData = details.sisItems.find(i => i.itemId === sisId).data;
-                        let linkedFrom = Array.from(locationItemLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
-                        
-                        for (let i = 0; i < qty; i++) {
-                            const row = {
-                                'Tipo': sisItemData['Tipo'] || '',
-                                'Tombamento': sisItemData['Tombamento'] || sisId,
-                                'Descrição': sisItemData['Descrição'] || '',
-                                'Unidade': sisItemData['Unidade'] || details.unidade,
-                                'Quantidade': 1,
-                                'Localização': sisItemData['Localização'] || details.local,
-                                'Estado': sisItemData['Estado'] || '',
-                                'Origem da Doação': sisItemData['Origem da Doação'] || '',
-                                'Observação': sisItemData['Observação'] || '',
-                                'Fornecedor': sisItemData['Fornecedor'] || '',
-                                'Ação': linkedFrom ? `DESLIGAR DO ID ${linkedFrom}` : 'REMOVER DO SIS.',
-                                'Local_Composto': compositeKey
-                            };
-                            reportData.push(row);
-                        }
-                    }
-                });
-            });
-
-            if (reportData.length === 0) {
-                showCustomAlert('🎉 O relatório final está vazio! Não há itens faltantes após as vinculações.');
-                return;
-            }
-
-            const headers = FINAL_HEADERS.concat(['Ação', 'Local_Composto']);
-            let csvContent = headers.join(';') + '\n';
-
-            reportData.forEach(item => {
-                const values = headers.map(header => {
-                    const value = item[header] !== undefined ? item[header] : '';
-                    // Sanitiza o valor para CSV
-                    let safeValue = String(value).replace(/"/g, '""');
-                    if (safeValue.includes(';') || safeValue.includes('\n')) {
-                        safeValue = `"${safeValue}"`;
-                    }
-                    return safeValue;
-                });
-                csvContent += values.join(';') + '\n';
-            });
-
-            const timestamp = new Date().toISOString().slice(0,10);
-            const filename = `Relatorio_Tombamento_Final_${timestamp}.csv`;
-
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Exporta CSV de Auditoria (dados consolidados por local)
-        function exportCSV() {
-            const selectedUnit = document.getElementById('unit-filter').value;
-            const timestamp = new Date().toISOString().slice(0,10);
-            let filename = `Auditoria_Consolidada_${selectedUnit === 'all_divergent' ? 'Geral' : selectedUnit}_${timestamp}.csv`;
-
-            const filteredData = (selectedUnit === 'all_divergent') 
-                ? auditData 
-                : auditData.filter(item => normalizeString(item.unidade) === normalizeString(selectedUnit));
-
-            if (filteredData.length === 0) {
-                showCustomAlert('⚠️ Não há dados para exportar.');
-                return;
-            }
-
-            const headers = ['Unidade', 'Local', 'Qtd_Inventario', 'Qtd_Sistema', 'Diferenca', 'Status_Quantidade', 'Status_Tombamento'];
-            let csvContent = headers.join(';') + '\n';
-            
-            filteredData.forEach(item => {
-                const details = discrepancyDetails.get(item.key);
-                
-                let statusQtd = 'OK';
-                if (item.diff > 0) statusQtd = 'Falta_Sistema';
-                if (item.diff < 0) statusQtd = 'Sobra_Sistema';
-                
-                let statusTombo = 'OK';
-                if (details && details.hasTombamentoDivergence) {
-                    statusTombo = 'Divergencia_Tombo';
-                }
-                
-                const values = [
-                    (item.originalUnit || item.unidade).replace(/;/g, ','),
-                    (item.originalLocal || item.local).replace(/;/g, ','),
-                    item.qtdInv,
-                    item.qtdSis,
-                    item.diff,
-                    statusQtd,
-                    statusTombo
-                ];
-                csvContent += values.join(';') + '\n';
-            });
-
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
 
         // === INICIALIZAÇÃO ===
