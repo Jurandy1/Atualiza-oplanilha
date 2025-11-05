@@ -1063,16 +1063,8 @@
             });
             
             if (maxCount === 0) {
-                 // Última tentativa: se a primeira linha não tem separadores óbvios, tratamos como um único campo (para evitar crash total, embora o parse seja falho)
-                 if (lines.length > 1) {
-                     // Tentativa de adivinhar separadores compactos que o usuário colou (ex: sem espaços)
-                     // Nesses casos é melhor quebrar o código do que retornar um array vazio e causar erro de cabeçalho
-                 }
-                 // Se não encontrou separador, retorna com a primeira linha, o que forçará o erro de validação de colunas, mas evitará um crash aqui.
-                 // Vamos forçar o erro mais claro no cabeçalho.
-                 
-                 // CORREÇÃO: Se não houver nenhum separador comum, tentamos dividir pelo tamanho do cabeçalho original, mas isso é muito arriscado. 
-                 // Vamos forçar que o cabeçalho seja limpo e que o separador padrão seja a tabulação, pois é o esperado de um dump de planilha.
+                 // Se não encontrou separador, a primeira linha inteira será o cabeçalho.
+                 // Isso forçará o erro de validação de colunas se os dados não estiverem formatados.
             }
             
             const rawHeaders = lines[0].split(separator).map(h => h.trim()).filter(h => h.length > 0);
@@ -1488,7 +1480,15 @@
 
                 noDiscrepancyMsg.classList.add('hidden');
             } else {
-                noDiscrepancyMsg.classList.remove('hidden');
+                 // REQ 2: Exibir mensagem de conclusão destacada
+                cardsContainer.innerHTML = `
+                    <div class="p-8 bg-gradient-to-r from-green-50 to-emerald-100 rounded-xl border-4 border-green-400 shadow-xl">
+                        <span class="text-6xl mb-4 block text-center">✅</span>
+                        <span class="text-2xl font-bold text-green-700 block mb-2 text-center">AUDITORIA CONCLUÍDA</span>
+                        <span class="text-gray-600 block text-center">Nenhuma discrepância pendente encontrada após a aplicação de todos os vínculos.</span>
+                    </div>
+                `;
+                noDiscrepancyMsg.classList.add('hidden'); // Oculta a mensagem genérica
             }
 
             updateSummaryUI(totalInv, totalSis, totalInv - totalSis);
@@ -2031,6 +2031,7 @@
                 .sort((a, b) => a.local.localeCompare(b.local));
             
             // REQ 1: Atualiza contadores
+            // Os contadores devem refletir o total de locais na unidade, não apenas os não mapeados.
             invCountSpan.textContent = `${filteredInv.length} Locais`;
             sisCountSpan.textContent = `${filteredSis.length} Locais`;
 
@@ -2038,24 +2039,24 @@
             autoMapSuggestions = autoMapLocations(filteredInv, filteredSis);
 
             // 4. Renderiza lista de Inventário (Origem)
-            if (filteredInv.length === 0) {
-                 invList.innerHTML = '<li class="text-gray-500 italic p-3">Nenhum local de inventário encontrado para esta unidade.</li>';
+            const remainingInv = filteredInv.filter(loc => !locationLinks.has(loc.key)); // Filtra locais já mapeados (REQ 1)
+
+            if (remainingInv.length === 0) {
+                 invList.innerHTML = '<li class="text-gray-500 italic p-3">Todos os locais desta unidade foram auditados e vinculados.</li>';
             } else {
-                filteredInv.forEach(loc => {
+                remainingInv.forEach(loc => {
                     const li = document.createElement('li');
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer location-link-mode`;
                     li.setAttribute('onclick', `selectLocalForAuditing(event, '${loc.key.replace(/'/g, "\\'")}')`);
                     li.dataset.key = loc.key; 
                     
-                    const linkedSisKey = locationLinks.get(loc.key);
+                    const linkedSisKey = locationLinks.get(loc.key); // Já sabemos que é null, mas mantém a estrutura
                     const suggestedSisKey = autoMapSuggestions.get(loc.key);
                     let badge = '';
                     let targetName = 'Sem Mapeamento';
                     
                     if (linkedSisKey) {
-                        targetName = allUniqueLocations.sis.get(linkedSisKey)?.local || 'Desconhecido';
-                        badge = `<span class="link-badge ml-2">🔗 VINCULADO a: ${targetName}</span>`;
-                        li.classList.add('item-linked');
+                        // Não deve chegar aqui se o filtro estiver correto
                     } else if (suggestedSisKey) {
                          targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
                          badge = `<span class="status-badge bg-yellow-200 text-yellow-800 ml-2">Sugestão: ${targetName}</span>`;
@@ -2075,7 +2076,7 @@
                 });
             }
 
-            // 5. Renderiza lista de Sistema (Destino)
+            // 5. Renderiza lista de Sistema (Destino) - Não deve ser filtrada por estado de vínculo
              if (filteredSis.length === 0) {
                  sisList.innerHTML = '<li class="text-gray-500 italic p-3">Nenhum local de sistema encontrado para esta unidade.</li>';
             } else {
@@ -2188,7 +2189,7 @@
             
             showCustomAlert(`✅ Vínculo de Local criado/confirmado!\n📋 ${invLoc.local} ➔ ⚙️ ${sisLoc.local}`);
             
-            // Atualiza a lista no modal para refletir o novo link
+            // REQ 1: Atualiza a lista no modal para refletir o novo link (sumir o local)
             setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
             // Reseta o painel de status
             currentAuditedInvKey = null;
@@ -2215,7 +2216,7 @@
             const invLoc = allUniqueLocations.inv.get(currentAuditedInvKey);
             showCustomAlert(`✅ Vínculo removido para: ${invLoc.local}`);
 
-            // Atualiza a lista no modal
+            // REQ 1: Atualiza a lista no modal
             setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
             // Reseta o painel de status
             currentAuditedInvKey = null;
