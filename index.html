@@ -1375,7 +1375,8 @@
                         originalUnit: invData.originalUnit || sisData.originalUnit,
                         originalLocal: invData.originalLocal || sisData.originalLocal,
                         // BUG FIX 1: Adiciona chave de unidade normalizada para filtragem
-                        normalizedUnitKey: invCompositeKey.split('|')[0] || compositeKey.split('|')[0], 
+                        // CORRIGIDO: Utiliza a chave armazenada em invData.actualInvKey, ou a chave composta se for item SÓ do Sistema.
+                        normalizedUnitKey: (invData.actualInvKey || compositeKey).split('|')[0], 
                         qtdInv: qtdInv,
                         qtdSis: qtdSis,
                         diff: diff
