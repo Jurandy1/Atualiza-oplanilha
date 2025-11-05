@@ -242,14 +242,18 @@
             padding: 0.75rem;
             text-align: left;
             border-bottom: 1px solid #e5e7eb;
+            font-size: 0.8rem; /* Fonte menor para caber mais colunas */
         }
 
         .report-table th {
             background: #f3f4f6;
             font-weight: 700;
             text-transform: uppercase;
-            font-size: 0.75rem;
+            font-size: 0.7rem; /* Fonte menor para caber mais colunas */
             color: #374151;
+            position: sticky; /* Fixa o cabeçalho ao rolar */
+            top: 0;
+            z-index: 10;
         }
 
         .report-table tr:hover {
@@ -278,6 +282,7 @@
 </head>
 <body class="p-4 md:p-8">
 
+    <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden flex items-center justify-center">
         <div class="text-center">
             <div class="loading-spinner mx-auto mb-4"></div>
@@ -287,6 +292,7 @@
     </div>
 
     <div class="max-w-7xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-2xl fade-in">
+        <!-- Header -->
         <div class="mb-8 border-b-4 border-primary pb-4">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2 flex items-center gap-3">
                 <span class="text-5xl">📊</span>
@@ -303,6 +309,7 @@
             </div>
         </div>
 
+        <!-- Gerenciador de Vinculações -->
         <div class="mb-6 p-6 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -329,6 +336,7 @@
             </div>
         </div>
 
+        <!-- Contadores -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border-2 border-blue-200">
                 <div class="flex items-center justify-between">
@@ -353,17 +361,18 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Inventário -->
             <div class="group">
                 <label for="list-inventario" class="block text-lg font-bold text-inventario mb-3 flex items-center gap-2">
                     <span class="text-2xl">📋</span>
                     <span>Dados do Inventário</span>
-                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Local, Item">ℹ️</span>
+                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Local, Item, Tombo e outros campos completos.">ℹ️</span>
                 </label>
                 <div class="relative">
                     <textarea 
                         id="list-inventario" 
                         class="w-full p-4 border-2 border-inventario rounded-xl focus:ring-2 focus:ring-inventario focus:border-inventario transition duration-150 custom-scrollbar" 
-                        placeholder="Cole os dados do Inventário incluindo cabeçalho..."
+                        placeholder="Cole os dados do Inventário incluindo cabeçalho. (Campos importantes: Unidade, Local, Item, Tombo)"
                         aria-label="Dados do Inventário"
                     ></textarea>
                     <div class="absolute top-2 right-2">
@@ -374,17 +383,18 @@
                 </div>
             </div>
             
+            <!-- Sistema -->
             <div class="group">
                 <label for="list-sistema" class="block text-lg font-bold text-sistema mb-3 flex items-center gap-2">
                     <span class="text-2xl">⚙️</span>
                     <span>Dados do Sistema</span>
-                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Localização, Descrição">ℹ️</span>
+                    <span class="tooltip text-gray-400 cursor-help text-sm" data-tooltip="Cole dados com: Unidade, Localização, Descrição, Tombamento e outros campos completos.">ℹ️</span>
                 </label>
                 <div class="relative">
                     <textarea 
                         id="list-sistema" 
                         class="w-full p-4 border-2 border-sistema rounded-xl focus:ring-2 focus:ring-sistema focus:border-sistema transition duration-150 custom-scrollbar" 
-                        placeholder="Cole os dados do Sistema incluindo cabeçalho..."
+                        placeholder="Cole os dados do Sistema incluindo cabeçalho. (Campos importantes: Unidade, Localização, Descrição, Tombamento)"
                         aria-label="Dados do Sistema"
                     ></textarea>
                     <div class="absolute top-2 right-2">
@@ -396,6 +406,7 @@
             </div>
         </div>
 
+        <!-- Botão de Ação -->
         <div class="mb-8">
              <button 
                 onclick="runMasterCount()" 
@@ -406,6 +417,7 @@
              </button>
         </div>
         
+        <!-- Container de Resultados -->
         <div id="results-container" class="mt-12 hidden fade-in">
             <div class="mb-6 p-6 bg-gradient-to-r from-primary to-primary-dark rounded-xl text-white">
                 <h2 id="report-title" class="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -415,6 +427,7 @@
                 <p class="text-green-100">Análise completa com vinculações aplicadas</p>
             </div>
 
+            <!-- Filtros -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div id="filter-container" class="hidden">
                     <label for="unit-filter" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
@@ -446,6 +459,7 @@
                 </div>
             </div>
             
+            <!-- Botões de Ação -->
             <div class="flex flex-wrap gap-3 mb-6">
                 <button 
                     onclick="generateFinalReport()" 
@@ -459,10 +473,11 @@
                     class="px-6 py-3 bg-gradient-to-r from-export to-fuchsia-600 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
                 >
                     <span class="text-xl">📥</span>
-                    <span>Exportar CSV</span>
+                    <span>Exportar CSV de Auditoria</span>
                 </button>
             </div>
             
+            <!-- Resumo -->
             <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div class="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-lg card-hover">
                     <div class="flex items-center justify-between mb-3">
@@ -501,6 +516,7 @@
                 </div>
             </div>
 
+            <!-- Cards de Discrepância (Modo Lista Agrupada - REQ 5) -->
             <div class="mb-4">
                 <h3 class="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
                     <span class="text-3xl">⚠️</span>
@@ -517,12 +533,15 @@
             </p>
             
             <div id="discrepancy-cards-container" class="grid grid-cols-1 gap-6">
-                </div>
+                <!-- Conteúdo agora renderizado como lista agrupada por unidade -->
+            </div>
         </div>
     </div>
 
+    <!-- MODAL DE VINCULAÇÃO -->
     <div id="item-details-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeModal()">
         <div class="modal-content bg-white w-full max-w-6xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
+            <!-- Header -->
             <div class="flex justify-between items-center border-b-2 border-gray-200 p-6 bg-gradient-to-r from-primary to-primary-dark text-white rounded-t-2xl">
                 <div>
                     <h2 id="modal-title" class="text-3xl font-bold">Detalhes dos Itens</h2>
@@ -533,12 +552,14 @@
                 </button>
             </div>
             
+            <!-- Modo de Vinculação -->
             <div id="linking-info" class="px-6 pt-4 pb-2 bg-purple-50 border-b-2 border-purple-200 hidden">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <span class="text-3xl link-active">🔗</span>
                         <div>
                             <p class="font-bold text-purple-800">Modo de Vinculação Ativo</p>
+                            <!-- REQ 3: Mensagem dinâmica -->
                             <p class="text-sm text-purple-600">Selecione 1 item do Inventário e 1 do Sistema para vincular</p>
                         </div>
                     </div>
@@ -548,6 +569,7 @@
                 </div>
             </div>
 
+            <!-- Controles -->
             <div class="px-6 pt-4 pb-2">
                 <div class="flex gap-3 mb-3">
                     <button onclick="toggleLinkingMode()" id="link-mode-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition flex items-center gap-2">
@@ -561,6 +583,7 @@
                 </div>
             </div>
 
+            <!-- Legenda -->
             <div class="px-6 pb-2">
                 <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
                     <h4 class="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -592,6 +615,7 @@
                 </div>
             </div>
             
+            <!-- Busca -->
             <div class="px-6 pb-4">
                 <div class="search-box relative">
                     <input 
@@ -605,6 +629,7 @@
                 </div>
             </div>
             
+            <!-- Listas -->
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
                 <div class="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
                     <h3 id="modal-inv-title" class="text-xl font-bold text-inventario mb-3 flex items-center gap-2">
@@ -625,6 +650,7 @@
                 </div>
             </div>
             
+            <!-- Footer -->
             <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl flex justify-between items-center">
                 <div class="text-sm text-gray-600">
                     <span class="font-semibold">Vinculações ativas:</span> <span id="modal-link-count">0</span>
@@ -639,6 +665,7 @@
         </div>
     </div>
 
+    <!-- MODAL GERENCIADOR DE LINKS -->
     <div id="link-manager-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeLinkManager()">
         <div class="modal-content bg-white w-full max-w-4xl rounded-2xl shadow-2xl transform scale-95 max-h-[80vh]" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b-2 border-purple-200 p-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-2xl">
@@ -652,7 +679,8 @@
             </div>
             <div class="p-6 overflow-y-auto custom-scrollbar" style="max-height: calc(80vh - 180px);">
                 <div id="link-list-container">
-                    </div>
+                    <!-- Lista será preenchida dinamicamente -->
+                </div>
             </div>
             <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
                 <button onclick="closeLinkManager()" class="px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-xl transition">
@@ -662,6 +690,7 @@
         </div>
     </div>
 
+    <!-- MODAL RELATÓRIO FINAL -->
     <div id="final-report-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0" onclick="closeFinalReport()">
         <div class="modal-content bg-white w-full max-w-6xl rounded-2xl shadow-2xl transform scale-95 max-h-[90vh]" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b-2 border-purple-200 p-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-2xl">
@@ -676,10 +705,11 @@
             <div class="p-6">
                 <button onclick="exportFinalReport()" class="mb-4 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition flex items-center gap-2">
                     <span>📥</span>
-                    <span>Exportar Relatório Final</span>
+                    <span>Exportar Relatório Final (CSV)</span>
                 </button>
                 <div id="final-report-content" class="overflow-y-auto custom-scrollbar" style="max-height: calc(90vh - 250px);">
-                    </div>
+                    <!-- Conteúdo será preenchido dinamicamente -->
+                </div>
             </div>
             <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
                 <button onclick="closeFinalReport()" class="px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-xl transition">
@@ -692,19 +722,38 @@
     <script>
         // === VARIÁVEIS GLOBAIS ===
         let auditData = [];
-        let globalInventarioData = [];
-        let globalSistemaData = [];
+        let globalInventarioData = []; // Armazena a linha completa do Inventário
+        let globalSistemaData = [];    // Armazena a linha completa do Sistema
         let uniqueUnits = new Set();
-        let discrepancyDetails = new Map(); // Map<compositeKey, { ..., hasQuantityDivergence: bool, hasTombamentoDivergence: bool, ... }>
+        let discrepancyDetails = new Map(); 
         let currentSearchTerm = '';
         
         // NOVO: Sistema de Vinculação
-        let itemLinks = new Map(); // Map<compositeKey, Map<invItemName, sysItemName>>
+        let itemLinks = new Map(); 
         let linkingMode = false;
         let selectedInvItem = null;
         let selectedSysItem = null;
         let currentCompositeKey = '';
         
+        // Cabeçalhos de exportação final (definidos pelo usuário)
+        const FINAL_HEADERS = ['Tipo', 'Tombamento', 'Descrição', 'Unidade', 'Quantidade', 'Localização', 'Estado', 'Origem da Doação', 'Observação', 'Fornecedor'];
+
+        // Colunas chave para busca nos dados
+        const COLUMNS = {
+            INV: {
+                UNIT: 'unidade',
+                LOCAL: 'local',
+                ITEM: 'item',
+                ID: 'tombo' 
+            },
+            SIS: {
+                UNIT: 'unidade',
+                LOCAL: 'localizacao',
+                ITEM: 'descricao',
+                ID: 'tombamento'
+            }
+        };
+
         // Carrega links do localStorage
         function loadLinksFromStorage() {
             const stored = localStorage.getItem('itemLinks');
@@ -830,8 +879,9 @@
         function groupItems(items) {
             const grouped = new Map();
             items.forEach(item => {
-                const trimmedItem = item.trim();
-                grouped.set(trimmedItem, (grouped.get(trimmedItem) || 0) + 1);
+                // item é um objeto de linha completa, usamos o nome do item (ID/Tombo) como chave
+                const itemId = item.itemId; 
+                grouped.set(itemId, (grouped.get(itemId) || 0) + 1);
             });
             return grouped;
         }
@@ -859,11 +909,11 @@
                 document.getElementById('filter-container').classList.remove('hidden');
                 document.getElementById('search-container').classList.remove('hidden');
                 
-                populateUnitFilter(); // REQ 1: Popula apenas unidades com divergência
+                populateUnitFilter(); 
                 document.getElementById('unit-filter').value = 'all_divergent';
                 document.getElementById('local-search').value = '';
                 
-                filterResultCards('all_divergent'); // REQ 5: Renderiza a lista agrupada
+                filterResultCards('all_divergent');
                 showLoading(false);
                 
                 setTimeout(() => {
@@ -880,7 +930,12 @@
             }
         }
 
-        // Processa dados aplicando vinculações (MODIFICADO para incluir Divergência de Tombamento - REQ 3, 4)
+        function findColumn(headers, key) {
+             const normalizedKey = normalizeString(key);
+             return headers.find(h => normalizeString(h).includes(normalizedKey));
+        }
+
+        // Processa dados e adiciona metadados (IDs)
         async function processAuditData() {
             const inventarioMap = new Map();
             const sistemaMap = new Map();
@@ -889,28 +944,31 @@
             discrepancyDetails.clear();
             
             const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
-            const invUnitCol = invHeader.find(k => normalizeString(k) === 'unidade');
-            const invLocalCol = invHeader.find(k => normalizeString(k) === 'local');
-            const invItemCol = invHeader.find(k => normalizeString(k) === 'item');
-            
             const sisHeader = globalSistemaData.length > 0 ? Object.keys(globalSistemaData[0]) : [];
-            const sisUnitCol = sisHeader.find(k => normalizeString(k) === 'unidade');
-            const sisLocalCol = sisHeader.find(k => normalizeString(k) === 'localizacao') || 
-                               sisHeader.find(k => normalizeString(k) === 'local');
-            const sisItemCol = sisHeader.find(k => normalizeString(k) === 'descricao') || 
-                              sisHeader.find(k => normalizeString(k) === 'item');
             
-            // Validação de Colunas
-            if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' não encontrada nos dados do Inventário. Verifique o cabeçalho.");
-            if (globalInventarioData.length > 0 && !invItemCol) throw new Error("Coluna 'Item' não encontrada nos dados do Inventário. Verifique o cabeçalho.");
-            if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' ou 'Local' não encontrada nos dados do Sistema. Verifique o cabeçalho.");
-            if (globalSistemaData.length > 0 && !sisItemCol) throw new Error("Coluna 'Descrição' ou 'Item' não encontrada nos dados do Sistema. Verifique o cabeçalho.");
+            const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
+            const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
+            const invItemCol = findColumn(invHeader, COLUMNS.INV.ITEM); // Descrição do item (Item)
+            const invIdCol = findColumn(invHeader, COLUMNS.INV.ID);     // ID do Tombamento (Tombo)
+            
+            const sisUnitCol = findColumn(sisHeader, COLUMNS.SIS.UNIT);
+            const sisLocalCol = findColumn(sisHeader, COLUMNS.SIS.LOCAL);
+            const sisItemCol = findColumn(sisHeader, COLUMNS.SIS.ITEM); // Descrição do item (Descrição)
+            const sisIdCol = findColumn(sisHeader, COLUMNS.SIS.ID);     // ID do Tombamento (Tombamento)
+            
+            // Validação de Colunas (usando ID como obrigatório para Tombo)
+            if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' não encontrada no Inventário. Verifique o cabeçalho.");
+            if (globalInventarioData.length > 0 && !invIdCol) throw new Error("Coluna 'Tombo' (Inventário) não encontrada. Verifique o cabeçalho.");
+            
+            if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' ou 'Local' não encontrada no Sistema. Verifique o cabeçalho.");
+            if (globalSistemaData.length > 0 && !sisIdCol) throw new Error("Coluna 'Tombamento' (Sistema) não encontrada. Verifique o cabeçalho.");
 
-            // Processa Inventário
+
+            // Processa Inventário: usa o Tombo como identificador de item (item ID)
             globalInventarioData.forEach(item => {
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = normalizeString(item[invLocalCol] || 'sem local');
-                const itemName = invItemCol ? (item[invItemCol] || 'Item sem nome') : 'Item sem nome';
+                const itemId = invIdCol ? (item[invIdCol] || `Item sem Tombo Inv-${Math.random()}`).trim() : `Item sem Tombo Inv-${Math.random()}`;
                 const compositeKey = `${unidade}|${local}`;
                 
                 allCompositeKeys.add(compositeKey);
@@ -918,21 +976,28 @@
                 if (!inventarioMap.has(compositeKey)) {
                     inventarioMap.set(compositeKey, { 
                         count: 0, 
-                        items: [],
+                        items: [], // Array de objetos { itemId, data: {objeto linha completa} }
                         originalUnit: item[invUnitCol] || 'Sem Unidade', 
                         originalLocal: item[invLocalCol] || 'Sem Local' 
                     });
                 }
                 const data = inventarioMap.get(compositeKey);
                 data.count++;
-                data.items.push(itemName.trim());
+                
+                // Salva a linha completa
+                data.items.push({ 
+                    itemId: itemId, 
+                    data: item, 
+                    // Adiciona a descrição para o modal
+                    description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`
+                });
             });
             
-            // Processa Sistema
+            // Processa Sistema: usa o Tombamento como identificador de item (item ID)
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = sisLocalCol ? normalizeString(item[sisLocalCol] || 'sem local') : 'sem local';
-                const itemName = sisItemCol ? (item[sisItemCol] || 'Item sem nome') : 'Item sem nome';
+                const itemId = sisIdCol ? (item[sisIdCol] || `Item sem Tombo Sis-${Math.random()}`).trim() : `Item sem Tombo Sis-${Math.random()}`;
                 const compositeKey = `${unidade}|${local}`;
 
                 allCompositeKeys.add(compositeKey);
@@ -940,17 +1005,22 @@
                 if (!sistemaMap.has(compositeKey)) {
                     sistemaMap.set(compositeKey, { 
                         count: 0, 
-                        items: [],
+                        items: [], // Array de objetos { itemId, data: {objeto linha completa} }
                         originalUnit: item[sisUnitCol] || 'Sem Unidade', 
                         originalLocal: item[sisLocalCol] || 'Sem Local' 
                     });
                 }
                 const data = sistemaMap.get(compositeKey);
                 
-                let quantidade = 1; // Contagem de linha
-
-                data.count += quantidade;
-                data.items.push(itemName.trim());
+                data.count++;
+                
+                // Salva a linha completa
+                data.items.push({ 
+                    itemId: itemId, 
+                    data: item,
+                    // Adiciona a descrição para o modal
+                    description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`
+                });
             });
 
             const sortedKeys = [...allCompositeKeys].sort();
@@ -983,27 +1053,30 @@
                     let hasQuantityDivergence = diff !== 0;
                     let hasTombamentoDivergence = false;
                     
-                    // REQ 3: Checa Divergência de Tombamento
-                    if (!hasQuantityDivergence && qtdInv > 0 && qtdSis > 0) {
-                        const invNames = new Set(invData.items.map(normalizeString));
-                        const sisNames = new Set(sisData.items.map(normalizeString));
+                    const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
+                    const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
+
+                    // Checa Divergência de Tombamento
+                    if (qtdInv > 0 || qtdSis > 0) {
+                        // Se houver algum ID em Inv que não está em Sis OU vice-versa
+                        let invOnly = [...invIds].some(id => !sisIds.has(id));
+                        let sisOnly = [...sisIds].some(id => !invIds.has(id));
                         
-                        // Checa se há itens em um mapa que não estão no outro
-                        let invOnly = [...invNames].some(name => !sisNames.has(name));
-                        let sisOnly = [...sisNames].some(name => !invNames.has(name));
-                        
-                        if (invOnly || sisOnly) {
+                        // Ou se as contagens são iguais, mas os conjuntos de IDs são diferentes
+                        if (qtdInv === qtdSis && [...invIds].length !== [...sisIds].length) {
+                             hasTombamentoDivergence = true;
+                        } else if (invOnly || sisOnly) {
                              hasTombamentoDivergence = true;
                         }
                     }
                     
-                    // REQ 4: Adiciona se houver qualquer divergência
+                    // Adiciona se houver qualquer divergência
                     if (hasQuantityDivergence || hasTombamentoDivergence) {
                         discrepancyDetails.set(compositeKey, {
                             unidade: auditRow.originalUnit,
                             local: auditRow.originalLocal,
-                            invItems: invData.items.sort(),
-                            sisItems: sisData.items.sort(),
+                            invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), // Objetos completos
+                            sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  // Objetos completos
                             hasQuantityDivergence: hasQuantityDivergence,
                             hasTombamentoDivergence: hasTombamentoDivergence,
                             qtdInv: qtdInv,
@@ -1020,7 +1093,6 @@
             uniqueUnits = new Set();
             const filterSelect = document.getElementById('unit-filter');
             
-            // Pega unidades que tem alguma divergência
             discrepancyDetails.forEach(details => {
                 uniqueUnits.add(details.unidade);
             });
@@ -1028,10 +1100,8 @@
             uniqueUnits.delete('');
             uniqueUnits.delete('Sem Unidade');
 
-            // Remove todas as opções (inclusive a antiga "Todas as Unidades") para reconstruir
             filterSelect.innerHTML = ''; 
 
-            // Adiciona a opção "Todas as Unidades Divergentes"
             const allOption = document.createElement('option');
             allOption.value = "all_divergent";
             allOption.textContent = "🌐 Todas as Unidades Divergentes";
@@ -1055,7 +1125,6 @@
             let totalInv = 0;
             let totalSis = 0;
 
-            // Filtra auditData para calcular o resumo total (que deve ser de todas as unidades, mas pode ser filtrado se desejado)
             const filteredAuditData = (selectedUnit === 'all_divergent') 
                 ? auditData 
                 : auditData.filter(item => normalizeString(item.originalUnit) === normalizeString(selectedUnit));
@@ -1065,12 +1134,9 @@
                 totalSis += item.qtdSis;
             }
             
-            // Filtra discrepancyDetails (que já contém apenas divergências)
             const searchFilteredEntries = [...discrepancyDetails.entries()].filter(([key, details]) => {
-                // Filtro por Unidade
                 const matchesUnit = selectedUnit === 'all_divergent' || normalizeString(details.unidade) === normalizeString(selectedUnit);
                 
-                // Filtro por Busca
                 const matchesSearch = currentSearchTerm 
                     ? normalizeString(details.local).includes(normalizeString(currentSearchTerm)) ||
                       normalizeString(details.unidade).includes(normalizeString(currentSearchTerm))
@@ -1081,7 +1147,6 @@
 
             const discrepancyCount = searchFilteredEntries.length;
             
-            // REQ 5: Agrupa por Unidade
             const groupedDetails = new Map();
             searchFilteredEntries.forEach(([key, details]) => {
                 const unit = details.unidade;
@@ -1091,7 +1156,6 @@
                 groupedDetails.get(unit).push({key, details});
             });
 
-            // Renderiza Lista Agrupada
             if (discrepancyCount > 0) {
                 const sortedUnits = [...groupedDetails.keys()].sort();
                 
@@ -1105,7 +1169,8 @@
                             <span class="ml-auto bg-primary text-white px-3 py-1 rounded-full text-sm">${groupedDetails.get(unit).length} locais com divergência</span>
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            </div>
+                            <!-- Cards here -->
+                        </div>
                     `;
                     const cardsSubContainer = unitSection.querySelector('.grid');
                     
@@ -1143,7 +1208,7 @@
             let divergenceWarning = '';
 
             if (item.hasQuantityDivergence && item.hasTombamentoDivergence) {
-                // REQ 4: Divergência de Quantidade e Tombo
+                // Divergência de Quantidade e Tombo
                 cardClass = 'bg-gradient-to-br from-red-100 to-red-200 border-red-400';
                 diffClass = 'text-red-600';
                 borderColor = 'border-red-500';
@@ -1157,7 +1222,7 @@
                 icon = item.diff > 0 ? '⬇️' : '⬆️'; 
                 divergenceWarning = '<span class="status-badge bg-red-200 text-red-800 pulse-warning">⚠️ Qtd. Divergente</span>';
             } else if (item.hasTombamentoDivergence) {
-                // REQ 3: Divergência de Tombamento (Qtd OK)
+                // Divergência de Tombamento (Qtd OK)
                 cardClass = 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-300';
                 diffClass = 'text-gray-700';
                 borderColor = 'border-yellow-400';
@@ -1169,7 +1234,7 @@
             
             const card = document.createElement('button');
             card.className = `p-6 border-2 rounded-xl shadow-lg text-left transition-all card-hover ${cardClass} ${borderColor}`;
-            card.setAttribute('onclick', `openModal('${compositeKey}')`); // Usa a chave composta
+            card.setAttribute('onclick', `openModal('${compositeKey}')`); 
             card.innerHTML = `
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
@@ -1281,8 +1346,8 @@
             }
         }
 
-        // REQ 2: Função para selecionar item - não seleciona automaticamente
-        function selectItemForLinking(event, itemName, isInventory) {
+        // Função para selecionar item - usa o itemId (Tombo/Tombamento)
+        function selectItemForLinking(event, itemId, isInventory) {
             if (!linkingMode) return;
             
             event.stopPropagation(); 
@@ -1291,11 +1356,11 @@
             if (!clickedLi) return;
 
             if (isInventory) {
-                selectedInvItem = itemName;
+                selectedInvItem = itemId;
                 document.querySelectorAll('#modal-inv-list .item-selected').forEach(el => el.classList.remove('item-selected'));
                 clickedLi.classList.add('item-selected');
             } else {
-                selectedSysItem = itemName;
+                selectedSysItem = itemId;
                 document.querySelectorAll('#modal-sis-list .item-selected').forEach(el => el.classList.remove('item-selected'));
                 clickedLi.classList.add('item-selected');
             }
@@ -1305,7 +1370,7 @@
             }
         }
 
-        // REQ 2, 3: Cria link e melhora efeito de escolha (itens somem)
+        // Cria link e melhora efeito de escolha (itens somem)
         function createLink(invItem, sysItem) {
             if (!itemLinks.has(currentCompositeKey)) {
                 itemLinks.set(currentCompositeKey, new Map());
@@ -1321,12 +1386,10 @@
             selectedSysItem = null;
             document.querySelectorAll('.item-selected').forEach(el => el.classList.remove('item-selected'));
             
-            // Rerenderiza listas para fazer itens sumirem (REQ 2)
             const details = discrepancyDetails.get(currentCompositeKey);
             if (details) {
                 const tombamentoOnly = details.hasTombamentoDivergence && !details.hasQuantityDivergence;
                 
-                // Rerender lists to make items disappear
                 renderModalLists(details.invItems, details.sisItems, document.getElementById('modal-search').value);
                 
                 // Checa se a lista ficou vazia após o link (REQ 3: finaliza ligação de tombamento)
@@ -1341,7 +1404,7 @@
                 }
 
                 // Exibe alerta padrão
-                showCustomAlert(`✅ Vínculo criado!\n📋 Inventário: ${invItem}\n⚙️ Sistema: ${sysItem}`);
+                showCustomAlert(`✅ Vínculo criado!\n📋 Inventário ID: ${invItem}\n⚙️ Sistema ID: ${sysItem}`);
             }
         }
 
@@ -1480,11 +1543,12 @@
             }, 10);
         }
 
-        // REQ 2, 3: Renderiza listas filtrando itens vinculados (sumir) e atualiza subtítulo
+        // Renderiza listas filtrando itens vinculados (sumir) e atualiza subtítulo
         function renderModalLists(rawInvItems, rawSisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
             const sisList = document.getElementById('modal-sis-list');
             
+            // Agrupa por itemId (Tombo/Tombamento)
             const invQtyMap = groupItems(rawInvItems);
             const sisQtyMap = groupItems(rawSisItems);
             
@@ -1493,39 +1557,53 @@
             const tempInvQtyMap = new Map(invQtyMap);
             const tempSisQtyMap = new Map(sisQtyMap);
 
-            locationLinks.forEach((sysName, invName) => {
-                const invQty = tempInvQtyMap.get(invName) || 0;
-                const sisQty = tempSisQtyMap.get(sysName) || 0;
+            locationLinks.forEach((sysId, invId) => {
+                const invQty = tempInvQtyMap.get(invId) || 0;
+                const sisQty = tempSisQtyMap.get(sysId) || 0;
 
                 const consumed = Math.min(invQty, sisQty);
                 
                 if (consumed > 0) {
-                    tempInvQtyMap.set(invName, invQty - consumed);
-                    tempSisQtyMap.set(sysName, sisQty - consumed);
+                    tempInvQtyMap.set(invId, invQty - consumed);
+                    tempSisQtyMap.set(sysId, sisQty - consumed);
                 }
             });
 
-            // Filtra e prepara dados para exibição (apenas itens restantes)
-            const filteredInvItems = [...tempInvQtyMap.entries()]
-                .filter(([name, qty]) => qty > 0 && 
-                    (!searchTerm || normalizeString(name).includes(normalizeString(searchTerm)))
-                )
-                .flatMap(([name, qty]) => Array(qty).fill({ name, qty: 1, totalQty: qty })); // Cria array de objetos com totalQty para badge
+            // Converte Map<itemId, qty> para lista de objetos ItemData
+            function mapToList(map, rawItems) {
+                const list = [];
+                map.forEach((qty, itemId) => {
+                    if (qty > 0) {
+                        const itemData = rawItems.find(i => i.itemId === itemId);
+                        if (itemData) {
+                            // Cria um item por quantidade restante
+                            for(let i = 0; i < qty; i++) {
+                                list.push({
+                                    itemId: itemId,
+                                    description: itemData.description,
+                                    totalQty: qty // Usamos a quantidade total restante aqui
+                                });
+                            }
+                        }
+                    }
+                });
+                return list;
+            }
+
+            const filteredInvItems = mapToList(tempInvQtyMap, rawInvItems)
+                .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
             
-            const filteredSisItems = [...tempSisQtyMap.entries()]
-                .filter(([name, qty]) => qty > 0 && 
-                    (!searchTerm || normalizeString(name).includes(normalizeString(searchTerm)))
-                )
-                .flatMap(([name, qty]) => Array(qty).fill({ name, qty: 1, totalQty: qty }));
+            const filteredSisItems = mapToList(tempSisQtyMap, rawSisItems)
+                .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
 
             // Títulos
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
-                <span>Inventário (${filteredInvItems.length} itens restantes)</span>
+                <span>Inventário (${filteredInvItems.length} tombo(s) restantes)</span>
             `;
             document.getElementById('modal-sis-title').innerHTML = `
                 <span class="text-2xl">⚙️</span>
-                <span>Sistema (${filteredSisItems.length} itens restantes)</span>
+                <span>Sistema (${filteredSisItems.length} tombamento(s) restantes)</span>
             `;
 
             // Renderiza Inventário
@@ -1533,26 +1611,27 @@
             if (filteredInvItems.length === 0) {
                 invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante</li>';
             } else {
-                let currentItemName = '';
+                let currentItemId = '';
                 let indexCounter = 0;
 
                 filteredInvItems.forEach((itemData) => {
-                    const { name, totalQty } = itemData;
+                    const { itemId, description, totalQty } = itemData;
 
-                    if (name !== currentItemName) {
-                        currentItemName = name;
+                    if (itemId !== currentItemId) {
+                        currentItemId = itemId;
                         indexCounter++;
                         
                         const li = document.createElement('li');
+                        // No modal, só restam itens "Só Inventário"
                         li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-inv ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
                         if (linkingMode) {
-                            li.setAttribute('onclick', `selectItemForLinking(event, '${name.replace(/'/g, "\\'")}', true)`);
+                            li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', true)`);
                         }
                         
                         li.innerHTML = `
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                                <span class="flex-1 font-medium">${name}</span>
+                                <span class="flex-1 font-medium">ID: ${itemId} | Descrição: ${description}</span>
                             </div>
                             <div class="ml-9">
                                 <span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">⚠️ Restante (Qtd: ${totalQty})</span>
@@ -1568,26 +1647,27 @@
             if (filteredSisItems.length === 0) {
                 sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante</li>';
             } else {
-                let currentItemName = '';
+                let currentItemId = '';
                 let indexCounter = 0;
 
                 filteredSisItems.forEach((itemData) => {
-                    const { name, totalQty } = itemData;
+                    const { itemId, description, totalQty } = itemData;
 
-                    if (name !== currentItemName) {
-                        currentItemName = name;
+                    if (itemId !== currentItemId) {
+                        currentItemId = itemId;
                         indexCounter++;
                         
                         const li = document.createElement('li');
+                        // No modal, só restam itens "Só Sistema"
                         li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-sys ${linkingMode ? 'linking-mode cursor-pointer' : ''}`;
                         if (linkingMode) {
-                            li.setAttribute('onclick', `selectItemForLinking(event, '${name.replace(/'/g, "\\'")}', false)`);
+                            li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', false)`);
                         }
                         
                         li.innerHTML = `
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                                <span class="flex-1 font-medium">${name}</span>
+                                <span class="flex-1 font-medium">ID: ${itemId} | Descrição: ${description}</span>
                             </div>
                             <div class="ml-9">
                                 <span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">⚠️ Restante (Qtd: ${totalQty})</span>
@@ -1609,7 +1689,7 @@
                 subtitle += ' | ⚠️ Divergência de Quantidade';
             } else if (details.hasTombamentoDivergence) {
                 subtitle += ' | 🔄 Divergência de Tombo (Qtd. OK)';
-                linkingMessage = 'Esse local não tem divergência de quantidade. Vincule os itens soltos para finalizar a ligação.'; // REQ 3
+                linkingMessage = 'Esse local não tem divergência de quantidade. Vincule os IDs soltos (Tombo/Tombamento) para finalizar a ligação.'; 
             }
             
             document.getElementById('modal-subtitle').textContent = subtitle;
@@ -1635,7 +1715,6 @@
         }
 
         // === GERENCIADOR DE LINKS ===
-        // ... (funções toggleLinkManager, closeLinkManager, updateLinkManagerDisplay, exportLinks, importLinks permanecem iguais)
         function toggleLinkManager() {
             const modal = document.getElementById('link-manager-modal');
             const modalContent = modal.querySelector('.modal-content');
@@ -1689,9 +1768,9 @@
                     linkItem.className = 'flex items-center justify-between bg-white p-3 rounded-lg shadow';
                     linkItem.innerHTML = `
                         <div class="flex-1">
-                            <span class="font-semibold text-blue-700">📋 ${invItem}</span>
+                            <span class="font-semibold text-blue-700">📋 Tombo (Inv): ${invItem}</span>
                             <span class="mx-2 text-purple-600">🔗</span>
-                            <span class="font-semibold text-orange-700">⚙️ ${sysItem}</span>
+                            <span class="font-semibold text-orange-700">⚙️ Tombamento (Sis): ${sysItem}</span>
                         </div>
                         <button onclick="removeLink('${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
                             🗑️
@@ -1740,12 +1819,9 @@
             };
             input.click();
         }
-        // ... (fim das funções do gerenciador de links)
-
 
         // === RELATÓRIO FINAL ===
-        // ... (funções generateFinalReport, buildFinalReport, closeFinalReport, exportFinalReport permanecem iguais)
-
+        
         function generateFinalReport() {
             const modal = document.getElementById('final-report-modal');
             const modalContent = modal.querySelector('.modal-content');
@@ -1759,7 +1835,6 @@
                 modalContent.classList.remove('scale-95');
                 modalContent.classList.add('scale-100');
                 
-                // Gera conteúdo
                 setTimeout(() => {
                     const reportHTML = buildFinalReport();
                     content.innerHTML = reportHTML;
@@ -1767,58 +1842,118 @@
             }, 10);
         }
 
+        // Novo: Constrói o relatório final com todos os campos e lida com Tombamento
         function buildFinalReport() {
             const unitReport = new Map();
             
-            // Para cada local com discrepância
+            // Mapeia todas as linhas completas do Inventário e Sistema por ItemID (Tombo/Tombamento)
+            const allInvItems = new Map(); // Map<itemId, Array<{itemId, data}>>
+            const allSisItems = new Map();
+            
+            globalInventarioData.forEach(item => {
+                const itemId = item[findColumn(Object.keys(item), COLUMNS.INV.ID)];
+                if (itemId) {
+                    if (!allInvItems.has(itemId)) allInvItems.set(itemId, []);
+                    allInvItems.get(itemId).push({ itemId, data: item });
+                }
+            });
+
+            globalSistemaData.forEach(item => {
+                const itemId = item[findColumn(Object.keys(item), COLUMNS.SIS.ID)];
+                if (itemId) {
+                    if (!allSisItems.has(itemId)) allSisItems.set(itemId, []);
+                    allSisItems.get(itemId).push({ itemId, data: item });
+                }
+            });
+
+
+            // Itera sobre as discrepâncias (locais)
             discrepancyDetails.forEach((details, compositeKey) => {
-                const [unidade, local] = compositeKey.split('|');
+                
                 const locationLinks = itemLinks.get(compositeKey) || new Map();
                 
-                const invMap = groupItems(details.invItems);
-                const sisMap = groupItems(details.sisItems);
+                const invMap = groupItems(details.invItems); // Map<itemId, qty>
+                const sisMap = groupItems(details.sisItems); // Map<itemId, qty>
                 
                 const missing = [];
                 const extra = [];
                 
-                // Analisa considerando vinculações
-                const processedSys = new Set();
+                const processedSysIds = new Set();
                 
-                // Processa Inventário: Falta/Sobra após links e itens sem link
-                invMap.forEach((invQty, invItem) => {
-                    const linkedSys = locationLinks.get(invItem);
+                // 1. Processa Itens do Inventário (o que deveria estar lá)
+                invMap.forEach((invQty, invId) => {
+                    const linkedSysId = locationLinks.get(invId);
                     
-                    if (linkedSys) {
-                        // Item vinculado
-                        processedSys.add(linkedSys);
-                        const sisQty = sisMap.get(linkedSys) || 0;
+                    if (linkedSysId) {
+                        processedSysIds.add(linkedSysId);
+                        const sisQty = sisMap.get(linkedSysId) || 0;
                         const diff = invQty - sisQty;
+                        
+                        // Se Inventário tem mais do que Sistema (após vínculo)
                         if (diff > 0) {
-                            missing.push({ item: invItem, qty: diff, linked: linkedSys, type: 'Missing_Linked' });
-                        } else if (diff < 0) {
-                            extra.push({ item: linkedSys, qty: Math.abs(diff), type: 'Extra_Linked' });
-                        }
+                            // Faltando diff itens do SISTEMA (para o ID vinculado)
+                            // A lista Missing deve se basear nos dados do Inventário
+                            const invItemData = details.invItems.find(i => i.itemId === invId);
+                            if (invItemData) {
+                                for(let i = 0; i < diff; i++) {
+                                     missing.push({ ...invItemData, type: 'Missing_Linked', qty: 1, linkedTo: linkedSysId });
+                                }
+                            }
+                        } 
+                        // Se Sistema tem mais do que Inventário (após vínculo) - tratado em 2.
                     } else {
-                        // Item não vinculado (Tombamento/Qtd)
-                        const sisQty = sisMap.get(invItem) || 0;
+                        // Item NÃO VINCULADO (pode ser discrepância de QTD, Tombo ou Só Inventário)
+                        const sisQty = sisMap.get(invId) || 0;
                         const diff = invQty - sisQty;
-
+                        
                         if (diff > 0) {
-                            missing.push({ item: invItem, qty: diff, type: 'Missing_Unlinked' });
-                        } else if (diff < 0) {
-                            extra.push({ item: invItem, qty: Math.abs(diff), type: 'Extra_Unlinked' });
-                        } else if (sisQty === 0 && invQty > 0) {
-                            // Só no Inventário (caso onde qtdInv > 0 e qtdSis = 0)
-                            missing.push({ item: invItem, qty: invQty, type: 'Missing_OnlyInv' });
+                            // Faltando diff itens do SISTEMA (para o ID não vinculado)
+                            const invItemData = details.invItems.find(i => i.itemId === invId);
+                            if (invItemData) {
+                                for(let i = 0; i < diff; i++) {
+                                    missing.push({ ...invItemData, type: 'Missing_Unlinked', qty: 1 });
+                                }
+                            }
                         }
                     }
                 });
                 
-                // Itens extras no sistema que não foram vinculados nem tinham correspondência direta
-                sisMap.forEach((sisQty, sisItem) => {
-                    // Se o item do sistema não foi processado por um link E não existe no inventário (sem link)
-                    if (!processedSys.has(sisItem) && !invMap.has(sisItem)) {
-                        extra.push({ item: sisItem, qty: sisQty, type: 'Extra_OnlySys' });
+                // 2. Processa Itens do Sistema (o que sobrou)
+                sisMap.forEach((sisQty, sisId) => {
+                    const invQty = invMap.get(sisId) || 0;
+                    
+                    if (processedSysIds.has(sisId)) {
+                        // Item foi vinculado. Checa se sobrou no Sistema.
+                        let linkedInvId = Array.from(locationLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
+
+                        const originalInvQty = invMap.get(linkedInvId) || 0;
+                        const diff = sisQty - originalInvQty; // Sis - Inv
+                        
+                        if (diff > 0) {
+                            // Sobrando diff itens no SISTEMA (após vínculo)
+                            const sisItemData = details.sisItems.find(i => i.itemId === sisId);
+                            if (sisItemData) {
+                                for(let i = 0; i < diff; i++) {
+                                     extra.push({ ...sisItemData, type: 'Extra_Linked', qty: 1, linkedFrom: linkedInvId });
+                                }
+                            }
+                        }
+                    } else if (locationLinks.has(sisId)) {
+                        // Se esse sisId é o TARGET de um link, já foi tratado pelo invMap
+                        return;
+                    } else {
+                        // Item NÃO VINCULADO e Sobrando
+                        const diff = sisQty - invQty; // Sis - Inv
+                        
+                        if (diff > 0) {
+                            // Sobrando diff itens no SISTEMA (não vinculado)
+                            const sisItemData = details.sisItems.find(i => i.itemId === sisId);
+                            if (sisItemData) {
+                                for(let i = 0; i < diff; i++) {
+                                    extra.push({ ...sisItemData, type: 'Extra_Unlinked', qty: 1 });
+                                }
+                            }
+                        }
                     }
                 });
                 
@@ -1856,25 +1991,42 @@
                     `;
                     
                     if (location.missing.length > 0) {
+                        // Tabela para ITENS FALTANTES (devem ser adicionados ao sistema, logo, dados do Inventário)
                         html += `
-                            <div class="mb-4">
+                            <div class="mb-4 overflow-x-auto custom-scrollbar">
                                 <p class="font-bold text-red-700 mb-2">⚠️ FALTANDO (adicionar ao sistema):</p>
                                 <table class="report-table">
                                     <thead>
                                         <tr>
-                                            <th>Item</th>
-                                            <th>Quantidade</th>
-                                            <th>Vínculo</th>
+                                            <th>Tipo</th>
+                                            <th>Tombamento</th>
+                                            <th>Descrição</th>
+                                            <th>Unidade</th>
+                                            <th>Localização</th>
+                                            <th>Estado</th>
+                                            <th>Origem da Doação</th>
+                                            <th>Observação</th>
+                                            <th>Fornecedor</th>
+                                            <th>Ação</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                         `;
                         location.missing.forEach(item => {
+                            // Usa a data (linha completa) do item do Inventário
+                            const row = item.data; 
                             html += `
                                 <tr>
-                                    <td class="font-medium">${item.item}</td>
-                                    <td class="text-red-600 font-bold">${item.qty} und</td>
-                                    <td>${item.linked ? `🔗 ${item.linked}` : '-'}</td>
+                                    <td>${row['Tipo'] || '-'}</td>
+                                    <td class="font-medium">${row['Tombo'] || item.itemId}</td>
+                                    <td>${row['Item'] || '-'}</td>
+                                    <td>${row['Unidade'] || '-'}</td>
+                                    <td>${row['Local'] || '-'}</td>
+                                    <td>${row['Estado'] || '-'}</td>
+                                    <td>${row['Origem da Doação'] || '-'}</td>
+                                    <td>${row['Observação'] || '-'}</td>
+                                    <td>${row['Fornecedor'] || '-'}</td>
+                                    <td class="text-red-600 font-bold">${item.linkedTo ? `LIGAR AO ID ${item.linkedTo}` : 'INSERIR NO SIS.'}</td>
                                 </tr>
                             `;
                         });
@@ -1886,23 +2038,42 @@
                     }
                     
                     if (location.extra.length > 0) {
+                        // Tabela para ITENS SOBRANDO (devem ser removidos do sistema, logo, dados do Sistema)
                         html += `
                             <div>
                                 <p class="font-bold text-orange-700 mb-2">📦 SOBRANDO (remover do sistema):</p>
                                 <table class="report-table">
                                     <thead>
                                         <tr>
-                                            <th>Item</th>
-                                            <th>Quantidade</th>
+                                            <th>Tipo</th>
+                                            <th>Tombamento</th>
+                                            <th>Descrição</th>
+                                            <th>Unidade</th>
+                                            <th>Localização</th>
+                                            <th>Estado</th>
+                                            <th>Origem da Doação</th>
+                                            <th>Observação</th>
+                                            <th>Fornecedor</th>
+                                            <th>Ação</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                         `;
                         location.extra.forEach(item => {
+                            // Usa a data (linha completa) do item do Sistema
+                            const row = item.data;
                             html += `
                                 <tr>
-                                    <td class="font-medium">${item.item}</td>
-                                    <td class="text-orange-600 font-bold">${item.qty} und</td>
+                                    <td>${row['Tipo'] || '-'}</td>
+                                    <td class="font-medium">${row['Tombamento'] || item.itemId}</td>
+                                    <td>${row['Descrição'] || '-'}</td>
+                                    <td>${row['Unidade'] || '-'}</td>
+                                    <td>${row['Localização'] || '-'}</td>
+                                    <td>${row['Estado'] || '-'}</td>
+                                    <td>${row['Origem da Doação'] || '-'}</td>
+                                    <td>${row['Observação'] || '-'}</td>
+                                    <td>${row['Fornecedor'] || '-'}</td>
+                                    <td class="text-orange-600 font-bold">${item.linkedFrom ? `DESLIGAR DO ID ${item.linkedFrom}` : 'REMOVER DO SIS.'}</td>
                                 </tr>
                             `;
                         });
@@ -1935,22 +2106,122 @@
             }, 300);
         }
 
+        // Exporta CSV com os cabeçalhos solicitados
         function exportFinalReport() {
-            const content = document.getElementById('final-report-content').innerText;
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const reportData = [];
+
+            discrepancyDetails.forEach((details, compositeKey) => {
+                const locationLinks = itemLinks.get(compositeKey) || new Map();
+                const invMap = groupItems(details.invItems);
+                const sisMap = groupItems(details.sisItems);
+                
+                const tempInvMap = new Map(invMap);
+                const tempSisMap = new Map(sisMap);
+                
+                // 1. Processa Links para subtrair quantidades
+                locationLinks.forEach((sysId, invId) => {
+                    const invQty = tempInvMap.get(invId) || 0;
+                    const sisQty = tempSisMap.get(sysId) || 0;
+                    const consumed = Math.min(invQty, sisQty);
+                    if (consumed > 0) {
+                        tempInvMap.set(invId, invQty - consumed);
+                        tempSisMap.set(sysId, sisQty - consumed);
+                    }
+                });
+
+                // 2. Coleta ITENS FALTANTES (dados do Inventário)
+                tempInvMap.forEach((qty, invId) => {
+                    if (qty > 0) {
+                        const invItemData = details.invItems.find(i => i.itemId === invId).data;
+                        const linkedTo = locationLinks.get(invId);
+                        
+                        for (let i = 0; i < qty; i++) {
+                            const row = {
+                                'Tipo': invItemData['Tipo'] || '',
+                                'Tombamento': invItemData['Tombo'] || invId,
+                                'Descrição': invItemData['Item'] || '',
+                                'Unidade': invItemData['Unidade'] || details.unidade,
+                                'Quantidade': 1,
+                                'Localização': invItemData['Local'] || details.local,
+                                'Estado': invItemData['Estado'] || '',
+                                'Origem da Doação': invItemData['Origem da Doação'] || '',
+                                'Observação': invItemData['Observação'] || '',
+                                'Fornecedor': invItemData['Fornecedor'] || '',
+                                'Ação': linkedTo ? `LIGAR AO ID ${linkedTo}` : 'INSERIR NO SIS.',
+                                'Local_Composto': compositeKey 
+                            };
+                            reportData.push(row);
+                        }
+                    }
+                });
+
+                // 3. Coleta ITENS SOBRANDO (dados do Sistema)
+                tempSisMap.forEach((qty, sisId) => {
+                    if (qty > 0) {
+                        const sisItemData = details.sisItems.find(i => i.itemId === sisId).data;
+                        let linkedFrom = Array.from(locationLinks.entries()).find(([inv, sys]) => sys === sisId)?.[0];
+                        
+                        for (let i = 0; i < qty; i++) {
+                            const row = {
+                                'Tipo': sisItemData['Tipo'] || '',
+                                'Tombamento': sisItemData['Tombamento'] || sisId,
+                                'Descrição': sisItemData['Descrição'] || '',
+                                'Unidade': sisItemData['Unidade'] || details.unidade,
+                                'Quantidade': 1,
+                                'Localização': sisItemData['Localização'] || details.local,
+                                'Estado': sisItemData['Estado'] || '',
+                                'Origem da Doação': sisItemData['Origem da Doação'] || '',
+                                'Observação': sisItemData['Observação'] || '',
+                                'Fornecedor': sisItemData['Fornecedor'] || '',
+                                'Ação': linkedFrom ? `DESLIGAR DO ID ${linkedFrom}` : 'REMOVER DO SIS.',
+                                'Local_Composto': compositeKey
+                            };
+                            reportData.push(row);
+                        }
+                    }
+                });
+            });
+
+            if (reportData.length === 0) {
+                showCustomAlert('🎉 O relatório final está vazio! Não há itens faltantes após as vinculações.');
+                return;
+            }
+
+            const headers = FINAL_HEADERS.concat(['Ação', 'Local_Composto']);
+            let csvContent = headers.join(';') + '\n';
+
+            reportData.forEach(item => {
+                const values = headers.map(header => {
+                    const value = item[header] !== undefined ? item[header] : '';
+                    // Sanitiza o valor para CSV
+                    let safeValue = String(value).replace(/"/g, '""');
+                    if (safeValue.includes(';') || safeValue.includes('\n')) {
+                        safeValue = `"${safeValue}"`;
+                    }
+                    return safeValue;
+                });
+                csvContent += values.join(';') + '\n';
+            });
+
+            const timestamp = new Date().toISOString().slice(0,10);
+            const filename = `Relatorio_Tombamento_Final_${timestamp}.csv`;
+
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `relatorio_final_${new Date().toISOString().slice(0,10)}.txt`;
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
 
-        // === EXPORTAÇÃO CSV ===
-        
+        // Exporta CSV de Auditoria (dados consolidados por local)
         function exportCSV() {
             const selectedUnit = document.getElementById('unit-filter').value;
             const timestamp = new Date().toISOString().slice(0,10);
-            let filename = `Auditoria_${selectedUnit === 'all_divergent' ? 'Geral' : selectedUnit}_${timestamp}.csv`;
+            let filename = `Auditoria_Consolidada_${selectedUnit === 'all_divergent' ? 'Geral' : selectedUnit}_${timestamp}.csv`;
 
             const filteredData = (selectedUnit === 'all_divergent') 
                 ? auditData 
