@@ -1093,7 +1093,6 @@
             const inventarioMap = new Map();
             const sistemaMap = new Map();
             const allCompositeKeys = new Set();
-            auditData = [];
             discrepancyDetails.clear();
             
             const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
@@ -1209,6 +1208,7 @@
             const sortedKeys = [...allCompositeKeys].sort();
 
             // 4. Auditoria de Divergências (REQ 4: Locais sem divergência não são adicionados)
+            auditData = [];
             for (const compositeKey of sortedKeys) {
                 if (compositeKey === "sem unidade|sem local") continue;
 
@@ -1850,7 +1850,8 @@
             [...units].sort().forEach(unit => {
                 if (unit !== 'Sem Unidade') {
                     const option = document.createElement('option');
-                    option.value = unit;
+                    // CORREÇÃO: Usando a versão normalizada do nome da unidade como value
+                    option.value = normalizeString(unit); 
                     option.textContent = `🏢 ${unit}`;
                     unitFilter.appendChild(option);
                 }
@@ -1891,13 +1892,15 @@
 
 
             // 2. Filtra locais pela unidade selecionada
-            const normalizedUnit = normalizeString(selectedUnit);
+            // CORREÇÃO: Usamos o selectedUnit, que agora é a string normalizada (ex: "unidade x")
+            const normalizedUnit = selectedUnit; 
+            
             const filteredInv = [...allUniqueLocations.inv.values()]
-                .filter(loc => normalizeString(loc.unit) === normalizedUnit)
+                .filter(loc => loc.key.startsWith(normalizedUnit + '|'))
                 .sort((a, b) => a.local.localeCompare(b.local));
                 
             const filteredSis = [...allUniqueLocations.sis.values()]
-                .filter(loc => normalizeString(loc.unit) === normalizedUnit)
+                .filter(loc => loc.key.startsWith(normalizedUnit + '|'))
                 .sort((a, b) => a.local.localeCompare(b.local));
             
             // REQ 1: Atualiza contadores
