@@ -1028,13 +1028,14 @@
         
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
+            // APLICA TRIM e remove acentos e caracteres especiais, e substitui espaços por um único espaço
             return str
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
                 .replace(/[-/.,;:()]/g, ' ')
                 .replace(/\s+/g, ' ')
-                .trim();
+                .trim(); // Garante que não há espaços iniciais/finais após a limpeza
         }
 
         function parseData(text) {
@@ -1936,6 +1937,7 @@
                 globalInventarioData.forEach(item => {
                     const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                     const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    // CRIA A CHAVE NORMALIZADA
                     const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                     if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
                         allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
@@ -1944,6 +1946,7 @@
                 globalSistemaData.forEach(item => {
                     const unidade = sisUnitCol ? (item[sisUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                     const local = sisLocalCol ? (item[sisLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    // CRIA A CHAVE NORMALIZADA
                     const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                     if (local !== 'Sem Local' && !allUniqueLocations.sis.has(key)) {
                         allUniqueLocations.sis.set(key, { unit: unidade, local: local, key: key });
@@ -2019,7 +2022,7 @@
 
 
             // 2. Filtra locais pela unidade selecionada
-            // CORREÇÃO: Usamos o selectedUnit, que agora é a string normalizada (ex: "unidade x")
+            // selectedUnit é a chave normalizada (ex: "unidade x")
             const normalizedUnit = selectedUnit; 
             
             const filteredInv = [...allUniqueLocations.inv.values()]
