@@ -148,7 +148,7 @@
             border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 700;
-            animation: pulse-warning 2s ease-in-out infinite;
+            /* Remove pulse-warning for minor badges, keep only for cards */
         }
 
         @media (max-width: 640px) {
@@ -705,7 +705,7 @@
                     <!-- Lista de Vínculos de Local será preenchida dinamicamente -->
                 </div>
                 
-                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">Vínculos de Tombo/Item</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">Vínculos de Tombo/Item (Instâncias)</h3>
                 <div id="item-link-list-container">
                     <!-- Lista de Vínculos de Item será preenchida dinamicamente -->
                 </div>
@@ -857,11 +857,12 @@
         let discrepancyDetails = new Map(); 
         let currentSearchTerm = '';
         
-        // VINCULAÇÃO DE ITEM/TOMBO
+        // VINCULAÇÃO DE ITEM/TOMBO (AGORA RASTREIA POR INSTANCE ID ÚNICO)
+        // itemLinks: Map<compositeKey, Map<invInstanceId, sisInstanceId>>
         let itemLinks = new Map(); 
         let itemLinkingMode = false;
-        let selectedInvItem = null;
-        let selectedSysItem = null;
+        let selectedInvItem = null; // Agora armazena o instanceId
+        let selectedSysItem = null; // Agora armazena o instanceId
         let currentCompositeKey = '';
 
         // VINCULAÇÃO DE LOCAL (REQ 1)
@@ -899,6 +900,7 @@
 
             if (storedItem) {
                 try {
+                    // Item Links: Estrutura Map<compositeKey, Map<invInstanceId, sisInstanceId>>
                     const parsed = JSON.parse(storedItem);
                     itemLinks = new Map(Object.entries(parsed).map(([key, val]) => [key, new Map(Object.entries(val))]));
                 } catch (e) {
@@ -918,6 +920,7 @@
 
         // Salva links no localStorage
         function saveLinksToStorage() {
+            // Item Links: Converte Map<compositeKey, Map<invInstanceId, sisInstanceId>> para Objeto
             const itemObj = {};
             itemLinks.forEach((value, key) => {
                 itemObj[key] = Object.fromEntries(value);
@@ -1126,23 +1129,7 @@
             };
         }
 
-        // Helper global para agrupar itens
-        function groupItems(items) {
-            const grouped = new Map();
-            items.forEach(item => {
-                const itemId = item.itemId; 
-                
-                // CORREÇÃO: IGNORA IDS 'S/T' ou vazios para a contagem de DUPLICIDADE
-                if (normalizeString(itemId) === 's t' || normalizeString(itemId) === '') {
-                    // Para fins de agrupamento, itens S/T são contados separadamente
-                    // mas não disparam o alerta de DUPLICIDADE, pois não são IDs formais.
-                    // Mantemos o valor original para que a contagem Qtd seja correta.
-                }
-
-                grouped.set(itemId, (grouped.get(itemId) || 0) + 1);
-            });
-            return grouped;
-        }
+        // Função antiga groupItems removida/não mais necessária para renderModalLists
 
         // === ANÁLISE PRINCIPAL ===
         
@@ -1294,7 +1281,9 @@
                 const data = inventarioMap.get(compositeKey);
                 data.count++;
                 
+                // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
                 data.items.push({ 
+                    instanceId: `inv-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`, // Novo ID de instância
                     itemId: itemId, 
                     data: item, 
                     description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
@@ -1325,7 +1314,9 @@
                 
                 data.count++;
                 
+                // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
                 data.items.push({ 
+                    instanceId: `sis-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`, // Novo ID de instância
                     itemId: itemId, 
                     data: item,
                     description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
@@ -1383,6 +1374,8 @@
                         local: invData.originalLocal || sisData.originalLocal,
                         originalUnit: invData.originalUnit || sisData.originalUnit,
                         originalLocal: invData.originalLocal || sisData.originalLocal,
+                        // BUG FIX 1: Adiciona chave de unidade normalizada para filtragem
+                        normalizedUnitKey: invCompositeKey.split('|')[0] || compositeKey.split('|')[0], 
                         qtdInv: qtdInv,
                         qtdSis: qtdSis,
                         diff: diff
@@ -1391,6 +1384,7 @@
                     
                     discrepancyDetails.set(compositeKey, {
                         unidade: auditRow.originalUnit,
+                        normalizedUnitKey: auditRow.normalizedUnitKey, // BUG FIX 1
                         local: auditRow.originalLocal,
                         invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), 
                         sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  
@@ -1406,15 +1400,23 @@
 
         // REQ 3: Popula filtro com APENAS unidades que contêm divergência
         function populateUnitFilter() {
-            uniqueUnits = new Set();
+            // BUG FIX 1: Usa chave normalizada para garantir unicidade
+            const uniqueNormalizedUnits = new Map(); // Map<normalizedKey, originalName>
             const filterSelect = document.getElementById('unit-filter');
             
             discrepancyDetails.forEach(details => {
-                uniqueUnits.add(details.unidade);
+                const normalizedKey = details.normalizedUnitKey;
+                // Usa o nome original (não normalizado) para a exibição no dropdown
+                if (!uniqueNormalizedUnits.has(normalizedKey)) {
+                     uniqueNormalizedUnits.set(normalizedKey, details.unidade);
+                } else {
+                     // Caso haja nomes originais diferentes para a mesma chave normalizada, 
+                     // mantemos o primeiro encontrado (o mais representativo).
+                }
             });
 
-            uniqueUnits.delete('');
-            uniqueUnits.delete('Sem Unidade');
+            uniqueNormalizedUnits.delete('');
+            uniqueNormalizedUnits.delete('sem unidade');
 
             filterSelect.innerHTML = ''; 
 
@@ -1423,11 +1425,13 @@
             allOption.textContent = "🌐 Todas as Unidades Divergentes";
             filterSelect.appendChild(allOption);
             
-            const sortedUnits = [...uniqueUnits].sort();
-            sortedUnits.forEach(unit => {
+            // Filtra pelo nome normalizado, mas exibe o nome original
+            const sortedKeys = [...uniqueNormalizedUnits.keys()].sort();
+            sortedKeys.forEach(normKey => {
+                const originalName = uniqueNormalizedUnits.get(normKey);
                 const option = document.createElement('option');
-                option.value = unit;
-                option.textContent = `🏢 ${unit.toUpperCase()}`;
+                option.value = normKey; // O valor é a chave normalizada
+                option.textContent = `🏢 ${originalName.toUpperCase()}`;
                 filterSelect.appendChild(option);
             });
         }
@@ -1441,9 +1445,10 @@
             let totalInv = 0;
             let totalSis = 0;
 
+            // BUG FIX 1: Filtra pela chave normalizada
             const filteredAuditData = (selectedUnit === 'all_divergent') 
                 ? auditData 
-                : auditData.filter(item => normalizeString(item.originalUnit) === normalizeString(selectedUnit));
+                : auditData.filter(item => item.normalizedUnitKey === selectedUnit);
 
             for (const item of filteredAuditData) {
                 totalInv += item.qtdInv;
@@ -1451,7 +1456,8 @@
             }
             
             const searchFilteredEntries = [...discrepancyDetails.entries()].filter(([key, details]) => {
-                const matchesUnit = selectedUnit === 'all_divergent' || normalizeString(details.unidade) === normalizeString(selectedUnit);
+                // BUG FIX 1: Filtra pela chave normalizada
+                const matchesUnit = selectedUnit === 'all_divergent' || details.normalizedUnitKey === selectedUnit;
                 
                 const matchesSearch = currentSearchTerm 
                     ? normalizeString(details.local).includes(normalizeString(currentSearchTerm)) ||
@@ -1465,24 +1471,28 @@
             
             const groupedDetails = new Map();
             searchFilteredEntries.forEach(([key, details]) => {
-                const unit = details.unidade;
-                if (!groupedDetails.has(unit)) {
-                    groupedDetails.set(unit, []);
+                // BUG FIX 1: Agrupa pela chave normalizada
+                const unitKey = details.normalizedUnitKey; 
+                const unitName = details.unidade; // Nome original para exibição
+                
+                if (!groupedDetails.has(unitKey)) {
+                    groupedDetails.set(unitKey, { name: unitName, items: [] });
                 }
-                groupedDetails.get(unit).push({key, details});
+                groupedDetails.get(unitKey).items.push({key, details});
             });
 
             if (discrepancyCount > 0) {
-                const sortedUnits = [...groupedDetails.keys()].sort();
+                const sortedKeys = [...groupedDetails.keys()].sort();
                 
-                sortedUnits.forEach(unit => {
+                sortedKeys.forEach(unitKey => {
+                    const unitGroup = groupedDetails.get(unitKey);
                     const unitSection = document.createElement('div');
                     unitSection.className = 'mb-8 border-b border-gray-200 pb-4 fade-in';
                     unitSection.innerHTML = `
                         <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="text-3xl">🏢</span>
-                            <span>${unit}</span>
-                            <span class="ml-auto bg-primary text-white px-3 py-1 rounded-full text-sm">${groupedDetails.get(unit).length} locais com divergência</span>
+                            <span>${unitGroup.name}</span> <!-- Exibe o nome original -->
+                            <span class="ml-auto bg-primary text-white px-3 py-1 rounded-full text-sm">${unitGroup.items.length} locais com divergência</span>
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <!-- Cards here -->
@@ -1490,7 +1500,7 @@
                     `;
                     const cardsSubContainer = unitSection.querySelector('.grid');
                     
-                    groupedDetails.get(unit).forEach(entry => {
+                    unitGroup.items.forEach(entry => {
                         const card = createDiscrepancyCard(entry.details, entry.key);
                         cardsSubContainer.appendChild(card);
                     });
@@ -1514,7 +1524,7 @@
             updateSummaryUI(totalInv, totalSis, totalInv - totalSis);
             document.getElementById('discrepancy-count').textContent = discrepancyCount;
             
-            const unitText = selectedUnit === 'all_divergent' ? 'Todas as Unidades Divergentes' : selectedUnit.toUpperCase();
+            const unitText = selectedUnit === 'all_divergent' ? 'Todas as Unidades Divergentes' : discrepancyDetails.values().next().value?.unidade.toUpperCase() || 'RELATÓRIO GERAL';
             document.getElementById('report-title').innerHTML = `
                 <span class="text-4xl">📈</span>
                 <span>Relatório: ${unitText}</span>
@@ -1670,8 +1680,8 @@
             }
         }
 
-        // Função para selecionar item - usa o itemId (Tombo/Tombamento)
-        function selectItemForLinking(event, itemId, isInventory) {
+        // Função para selecionar item - AGORA USA O INSTANCE ID ÚNICO
+        function selectItemForLinking(event, instanceId, isInventory) {
             if (!itemLinkingMode) return;
             
             event.stopPropagation(); 
@@ -1679,29 +1689,32 @@
             const clickedLi = event.target.closest('li');
             if (!clickedLi) return;
 
+            // BUG FIX 2: Usa instanceId para rastreamento
             if (isInventory) {
-                selectedInvItem = itemId;
+                selectedInvItem = instanceId;
                 document.querySelectorAll('#modal-inv-list .item-selected').forEach(el => el.classList.remove('item-selected'));
                 clickedLi.classList.add('item-selected');
             } else {
-                selectedSysItem = itemId;
+                selectedSysItem = instanceId;
                 document.querySelectorAll('#modal-sis-list .item-selected').forEach(el => el.classList.remove('item-selected'));
                 clickedLi.classList.add('item-selected');
             }
             
             if (selectedInvItem && selectedSysItem) {
+                // BUG FIX 2: Passa instanceIds para a criação do link
                 createItemLink(selectedInvItem, selectedSysItem);
             }
         }
 
         // Cria link e melhora efeito de escolha (itens somem)
-        function createItemLink(invItem, sysItem) {
+        function createItemLink(invInstanceId, sysInstanceId) { // Agora usa Instance IDs
             if (!itemLinks.has(currentCompositeKey)) {
                 itemLinks.set(currentCompositeKey, new Map());
             }
             
             const locationLinks = itemLinks.get(currentCompositeKey);
-            locationLinks.set(invItem, sysItem);
+            // BUG FIX 2: Linka os IDs de Instância, não os IDs de Tombo
+            locationLinks.set(invInstanceId, sysInstanceId);
             
             saveLinksToStorage();
             
@@ -1712,23 +1725,26 @@
             
             const details = discrepancyDetails.get(currentCompositeKey);
             if (details) {
-                const tombamentoOnly = details.hasTombamentoDivergence && !details.hasQuantityDivergence;
+                // Obtém o Tombo ID para o alerta (Melhor UX)
+                const invTombo = details.invItems.find(i => i.instanceId === invInstanceId)?.itemId || invInstanceId;
+                const sysTombo = details.sisItems.find(i => i.instanceId === sysInstanceId)?.itemId || sysInstanceId;
                 
+                // Renderiza novamente a lista para remover os itens vinculados
                 renderModalLists(details.invItems, details.sisItems, document.getElementById('modal-search').value);
                 
-                // Checa se a lista ficou vazia após o link (REQ 3: finaliza ligação de tombamento)
+                // Checa se a lista ficou vazia após o link
                 const invListCount = document.getElementById('modal-inv-list').querySelectorAll('li').length;
                 const sisListCount = document.getElementById('modal-sis-list').querySelectorAll('li').length;
                 
-                if (tombamentoOnly && invListCount === 0 && sisListCount === 0) {
-                    showCustomAlert('✅ Vínculo criado e divergência de Tombo resolvida! Reanalisando a tabela...');
+                if (invListCount === 0 && sisListCount === 0) {
+                    showCustomAlert('✅ Vínculo criado e divergência resolvida! Reanalisando a tabela...');
                     closeModal();
                     runMasterCount(); // Re-run master count to remove the card from the main screen
                     return;
                 }
 
-                // Exibe alerta padrão
-                showCustomAlert(`✅ Vínculo criado!\n📋 Inventário ID: ${invItem}\n⚙️ Sistema ID: ${sysItem}`);
+                // Exibe alerta padrão (melhorado para mostrar o Tombo ID e a natureza do link)
+                showCustomAlert(`✅ Vínculo criado!\n📋 Inventário Tombo: ${invTombo}\n⚙️ Sistema Tombamento: ${sysTombo}`);
             }
         }
 
@@ -1755,98 +1771,75 @@
             }, 10);
         }
 
-        // Renderiza listas filtrando itens vinculados (sumir) e atualiza subtítulo
+        // Renderiza listas exibindo CADA INSTÂNCIA e filtrando itens vinculados
         function renderModalLists(rawInvItems, rawSisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
             const sisList = document.getElementById('modal-sis-list');
             
-            // Agrupa por itemId (Tombo/Tombamento)
-            const invQtyMap = groupItems(rawInvItems);
-            const sisQtyMap = groupItems(rawSisItems);
-            
-            // Aplica vinculações para determinar itens "consumidos"
+            // Mapa de links de instância para este local (Map<invInstanceId, sisInstanceId>)
             const locationItemLinks = itemLinks.get(currentCompositeKey) || new Map();
-            const tempInvQtyMap = new Map(invQtyMap);
-            const tempSisQtyMap = new Map(sisQtyMap);
+            
+            // Cria um Set de todas as Inv Instance IDs que foram vinculadas (para remover)
+            const linkedInvIds = new Set(locationItemLinks.keys());
+            // Cria um Set de todas as Sis Instance IDs que foram vinculadas (para remover)
+            const linkedSisIds = new Set(locationItemLinks.values());
 
-            locationItemLinks.forEach((sysId, invId) => {
-                const invQty = tempInvQtyMap.get(invId) || 0;
-                const sisQty = tempSisQtyMap.get(sysId) || 0;
-
-                const consumed = Math.min(invQty, sisQty);
-                
-                if (consumed > 0) {
-                    tempInvQtyMap.set(invId, invQty - consumed);
-                    tempSisQtyMap.set(sysId, sisQty - consumed);
-                }
-            });
-
-            // Converte Map<itemId, qty> para lista de objetos ItemData
-            function mapToList(map, rawItems) {
-                const uniqueItems = new Map(); // Map<itemId, {itemData, totalQty}>
-                map.forEach((qty, itemId) => {
-                    if (qty > 0) {
-                        const itemData = rawItems.find(i => i.itemId === itemId);
-                        if (itemData) {
-                            uniqueItems.set(itemId, {
-                                itemId: itemId,
-                                description: itemData.description,
-                                totalQty: qty, 
-                                state: itemData.state 
-                            });
-                        }
-                    }
-                });
-                return [...uniqueItems.values()];
-            }
-
-            const filteredInvItems = mapToList(tempInvQtyMap, rawInvItems)
+            // BUG FIX 2: Filtra itens que JÁ FORAM VINCULADOS (usando instanceId)
+            const filteredInvItems = rawInvItems
+                .filter(item => !linkedInvIds.has(item.instanceId)) 
                 .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
             
-            const filteredSisItems = mapToList(tempSisQtyMap, rawSisItems)
+            const filteredSisItems = rawSisItems
+                .filter(item => !linkedSisIds.has(item.instanceId)) 
                 .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
+                
+            // Lógica para detectar duplicidade de Tombo nos itens RESTANTES
+            const countTomboInv = new Map();
+            filteredInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
+            const countTomboSis = new Map();
+            filteredSisItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
 
             // Títulos
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
-                <span>Inventário (${filteredInvItems.length} tombo(s) restantes)</span>
+                <span>Inventário (${filteredInvItems.length} item(s) restante(s))</span>
             `;
             document.getElementById('modal-sis-title').innerHTML = `
                 <span class="text-2xl">⚙️</span>
-                <span>Sistema (${filteredSisItems.length} tombamento(s) restantes)</span>
+                <span>Sistema (${filteredSisItems.length} item(s) restante(s))</span>
             `;
 
-            // Renderiza Inventário
+            // Renderiza Inventário - AGORA ITERA SOBRE CADA INSTÂNCIA
             invList.innerHTML = '';
             if (filteredInvItems.length === 0) {
-                invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante</li>';
+                invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
             } else {
-                let indexCounter = 0;
-
-                filteredInvItems.forEach((itemData) => {
-                    const { itemId, description, totalQty, state } = itemData;
-                    indexCounter++;
+                filteredInvItems.forEach((itemData, index) => {
+                    const { instanceId, itemId, description, state } = itemData;
                     
                     const li = document.createElement('li');
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-inv ${itemLinkingMode ? 'linking-mode cursor-pointer' : ''}`;
                     if (itemLinkingMode) {
-                        li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', true)`);
+                        li.setAttribute('onclick', `selectItemForLinking(event, '${instanceId.replace(/'/g, "\\'")}', true)`);
                     }
                     
-                    // REQ 2: Lógica de exibição da quantidade (ID Único vs Duplicidade)
-                    // CORRIGIDO: Só verifica duplicidade se o ID não for S/T ou vazio
+                    // Lógica de exibição da duplicação (por item ID)
+                    const tomboCount = countTomboInv.get(itemId);
                     const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
-                    const badgeText = (totalQty > 1 && !isST)
-                        ? `⚠️ DUPLICIDADE DE TOMBO (Qtd: ${totalQty})` 
-                        : (isST)
-                        ? `⚠️ SEM ID (Qtd: ${totalQty})`
-                        : `⚠️ A VINCULAR (ID Único)`;
-
+                    
+                    let badgeText;
+                    if (isST) {
+                        badgeText = `⚠️ SEM ID (Tombo: ${itemId})`;
+                    } else if (tomboCount > 1) {
+                        badgeText = `⚠️ DUPLICIDADE DE TOMBO (${itemId}) - ${tomboCount} Instâncias`;
+                    } else {
+                        badgeText = `A VINCULAR (Tombo: ${itemId})`;
+                    }
 
                     li.innerHTML = `
                         <div class="flex items-center gap-3 mb-2">
-                            <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                            <span class="flex-1 font-medium">ID: ${itemId} | ${description}</span>
+                            <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
+                            <span class="flex-1 font-medium">${description}</span>
                         </div>
                         <div class="ml-9 flex flex-wrap gap-2 items-center">
                             <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
@@ -1857,36 +1850,37 @@
                 });
             }
 
-            // Renderiza Sistema
+            // Renderiza Sistema - AGORA ITERA SOBRE CADA INSTÂNCIA
             sisList.innerHTML = '';
             if (filteredSisItems.length === 0) {
-                sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante</li>';
+                sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
             } else {
-                let indexCounter = 0;
-
-                filteredSisItems.forEach((itemData) => {
-                    const { itemId, description, totalQty, state } = itemData;
-                    indexCounter++;
+                filteredSisItems.forEach((itemData, index) => {
+                    const { instanceId, itemId, description, state } = itemData;
                     
                     const li = document.createElement('li');
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition item-only-sys ${itemLinkingMode ? 'linking-mode cursor-pointer' : ''}`;
                     if (itemLinkingMode) {
-                        li.setAttribute('onclick', `selectItemForLinking(event, '${itemId.replace(/'/g, "\\'")}', false)`);
+                         li.setAttribute('onclick', `selectItemForLinking(event, '${instanceId.replace(/'/g, "\\'")}', false)`);
                     }
                     
-                    // REQ 2: Lógica de exibição da quantidade (ID Único vs Duplicidade)
-                    // CORRIGIDO: Só verifica duplicidade se o ID não for S/T ou vazio
+                    // Lógica de exibição da duplicação (por item ID)
+                    const tomboCount = countTomboSis.get(itemId);
                     const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
-                    const badgeText = (totalQty > 1 && !isST)
-                        ? `⚠️ DUPLICIDADE DE TOMBO (Qtd: ${totalQty})` 
-                        : (isST)
-                        ? `⚠️ SEM ID (Qtd: ${totalQty})`
-                        : `⚠️ A VINCULAR (ID Único)`;
+
+                    let badgeText;
+                    if (isST) {
+                        badgeText = `⚠️ SEM ID (Tombamento: ${itemId})`;
+                    } else if (tomboCount > 1) {
+                        badgeText = `⚠️ DUPLICIDADE DE TOMBAMENTO (${itemId}) - ${tomboCount} Instâncias`;
+                    } else {
+                        badgeText = `A VINCULAR (Tombamento: ${itemId})`;
+                    }
 
                     li.innerHTML = `
                         <div class="flex items-center gap-3 mb-2">
-                            <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${indexCounter}</span>
-                            <span class="flex-1 font-medium">ID: ${itemId} | ${description}</span>
+                            <span class="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-bold">${index + 1}</span>
+                            <span class="flex-1 font-medium">${description}</span>
                         </div>
                         <div class="ml-9 flex flex-wrap gap-2 items-center">
                             <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
@@ -2311,6 +2305,8 @@
                 itemContainer.innerHTML = '<p class="text-center text-gray-500 italic p-4">Nenhuma vinculação de item criada</p>';
             } else {
                 itemLinks.forEach((links, compositeKey) => {
+                    // Nota: O Tombo ID não está armazenado no link, apenas o Instance ID.
+                    // Isso será um desafio, mas o Instance ID garante a funcionalidade.
                     const [unidade, local] = compositeKey.split('|');
                     
                     const section = document.createElement('div');
@@ -2319,16 +2315,17 @@
                     
                     const listContainer = section.querySelector('.space-y-1');
                     
-                    links.forEach((sysItem, invItem) => {
+                    links.forEach((sysInstanceId, invInstanceId) => {
                         const linkItem = document.createElement('div');
                         linkItem.className = 'flex items-center justify-between bg-white p-2 rounded-lg shadow-sm text-xs';
+                        // Exibe os IDs de instância para fins de depuração
                         linkItem.innerHTML = `
                             <div class="flex-1">
-                                <span class="font-semibold text-blue-700">Inv Tombo: ${invItem}</span>
+                                <span class="font-semibold text-blue-700">Inv Instance ID: ${invInstanceId}</span>
                                 <span class="mx-1 text-purple-600">🔗</span>
-                                <span class="font-semibold text-orange-700">Sis Tombamento: ${sysItem}</span>
+                                <span class="font-semibold text-orange-700">Sis Instance ID: ${sysInstanceId}</span>
                             </div>
-                            <button onclick="removeLink('item|${compositeKey}', '${invItem.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
+                            <button onclick="removeLink('item|${compositeKey}', '${invInstanceId.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
                                 🗑️
                             </button>
                         `;
