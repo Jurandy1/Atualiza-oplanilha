@@ -778,9 +778,13 @@
             <!-- Listas de Locais (REQ 1: Modo Auditoria) -->
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
                 <div class="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
-                    <h3 class="text-xl font-bold text-inventario mb-3 flex items-center gap-2">
-                        <span class="text-2xl">📋</span>
-                        <span>Locais do Inventário (Origem)</span>
+                    <!-- REQ 1: Contador de Locais -->
+                    <h3 class="text-xl font-bold text-inventario mb-3 flex items-center justify-between">
+                        <span class="flex items-center gap-2">
+                            <span class="text-2xl">📋</span>
+                            <span>Inventário (Origem)</span>
+                        </span>
+                        <span id="inv-local-count" class="bg-blue-300 text-blue-900 px-3 py-1 rounded-full text-sm font-bold">0 Locais</span>
                     </h3>
                     <ul id="local-inv-list" class="space-y-2 text-sm text-gray-700">
                         <li class="text-gray-500 italic p-3">Selecione uma unidade para carregar os locais.</li>
@@ -788,9 +792,13 @@
                 </div>
                 
                 <div class="bg-orange-50 rounded-xl p-5 border-2 border-orange-200">
-                    <h3 class="text-xl font-bold text-sistema mb-3 flex items-center gap-2">
-                        <span class="text-2xl">⚙️</span>
-                        <span>Locais do Sistema (Destino)</span>
+                    <!-- REQ 1: Contador de Locais -->
+                    <h3 class="text-xl font-bold text-sistema mb-3 flex items-center justify-between">
+                        <span class="flex items-center gap-2">
+                            <span class="text-2xl">⚙️</span>
+                            <span>Sistema (Destino)</span>
+                        </span>
+                        <span id="sis-local-count" class="bg-orange-300 text-orange-900 px-3 py-1 rounded-full text-sm font-bold">0 Locais</span>
                     </h3>
                     <ul id="local-sis-list" class="space-y-2 text-sm text-gray-700">
                         <li class="text-gray-500 italic p-3">Selecione um local à esquerda para auditar o mapeamento, ou clique em um local aqui para definir um novo destino.</li>
@@ -878,7 +886,7 @@
             SIS: {
                 UNIT: 'unidade',
                 LOCAL: 'localizacao',
-                ITEM: 'descricao',
+                ITEM: 'item',
                 ID: 'tombamento',
                 STATE: 'estado' // REQ 2
             }
@@ -1597,8 +1605,8 @@
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-                modalContent.classList.add('scale-100');
+                modalContent.classList.remove('scale-100');
+                modalContent.classList.add('scale-95');
             }, 10);
         }
 
@@ -1861,12 +1869,16 @@
         function setupLocalLinkingModal(selectedUnit) {
             const invList = document.getElementById('local-inv-list');
             const sisList = document.getElementById('local-sis-list');
-            const unitFilter = document.getElementById('local-unit-filter');
+            const invCountSpan = document.getElementById('inv-local-count');
+            const sisCountSpan = document.getElementById('sis-local-count');
+            
             autoMapSuggestions = new Map();
             
             if (selectedUnit === 'none') {
                 invList.innerHTML = '<li class="text-gray-500 italic p-3">Selecione uma unidade para carregar os locais.</li>';
                 sisList.innerHTML = '<li class="text-gray-500 italic p-3">Selecione uma unidade.</li>';
+                invCountSpan.textContent = '0 Locais';
+                sisCountSpan.textContent = '0 Locais';
                 return;
             }
             
@@ -1888,6 +1900,10 @@
                 .filter(loc => normalizeString(loc.unit) === normalizedUnit)
                 .sort((a, b) => a.local.localeCompare(b.local));
             
+            // REQ 1: Atualiza contadores
+            invCountSpan.textContent = `${filteredInv.length} Locais`;
+            sisCountSpan.textContent = `${filteredSis.length} Locais`;
+
             // 3. Auto-mapeamento (sugestão)
             autoMapSuggestions = autoMapLocations(filteredInv, filteredSis);
 
@@ -1904,21 +1920,26 @@
                     const linkedSisKey = locationLinks.get(loc.key);
                     const suggestedSisKey = autoMapSuggestions.get(loc.key);
                     let badge = '';
-
+                    let targetName = 'Sem Mapeamento';
+                    
                     if (linkedSisKey) {
-                        const targetName = allUniqueLocations.sis.get(linkedSisKey)?.local || 'Desconhecido';
+                        targetName = allUniqueLocations.sis.get(linkedSisKey)?.local || 'Desconhecido';
                         badge = `<span class="link-badge ml-2">🔗 VINCULADO a: ${targetName}</span>`;
                         li.classList.add('item-linked');
                     } else if (suggestedSisKey) {
-                         const targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
+                         targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
                          badge = `<span class="status-badge bg-yellow-200 text-yellow-800 ml-2">Sugestão: ${targetName}</span>`;
                     } else {
                          badge = `<span class="status-badge bg-gray-200 text-gray-700 ml-2">Sem Vínculo</span>`;
                     }
                     
+                    // REQ 2: Exibe o local mapeado/sugerido ao lado do local de origem (na mesma caixa)
                     li.innerHTML = `
-                        <div class="font-semibold">${loc.local}</div>
-                        <div class="text-xs text-gray-500">🏢 ${loc.unit} ${badge}</div>
+                        <div class="font-semibold text-base">${loc.local}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Destino: <span class="font-bold text-gray-700">${targetName}</span>
+                        </div>
+                        <div class="mt-1">${badge}</div>
                     `;
                     invList.appendChild(li);
                 });
