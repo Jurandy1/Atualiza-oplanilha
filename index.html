@@ -1131,6 +1131,118 @@
 
         // Função antiga groupItems removida/não mais necessária para renderModalLists
 
+        // === FUNÇÕES DO GERENCIADOR DE LINKS (CORREÇÃO DE BUGS DE LIMPEZA/DELETAR/EXPORTAR/IMPORTAR) ===
+
+        function clearAllLinks() {
+            showCustomConfirm("Tem certeza que deseja limpar TODAS as vinculações de Itens e Locais salvas? Isso não pode ser desfeito.", () => {
+                itemLinks = new Map();
+                locationLinks = new Map();
+                saveLinksToStorage();
+                updateLinkCount();
+                closeLinkManager();
+                // A função `closeLinkManager` garante que o modal estará fechado.
+                showCustomAlert("✅ Todas as vinculações foram removidas. Execute a Análise para atualizar o relatório.");
+            });
+        }
+        
+        function exportLinks() {
+            const dataToExport = {
+                // Converte Map<compositeKey, Map<invInstanceId, sisInstanceId>> para Objeto aninhado para exportação JSON
+                itemLinks: Object.fromEntries([...itemLinks].map(([key, map]) => [key, Object.fromEntries(map)])),
+                locationLinks: Object.fromEntries(locationLinks)
+            };
+            
+            const jsonString = JSON.stringify(dataToExport, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vinculos_auditoria.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showCustomAlert('📥 Vínculos exportados como vinculos_auditoria.json');
+        }
+
+        function importLinks() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+
+            input.onchange = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        let linksLoaded = 0;
+                        
+                        if (data.itemLinks) {
+                            // Item Links: Converte Objeto aninhado de volta para Map<compositeKey, Map<invInstanceId, sisInstanceId>>
+                            itemLinks = new Map(Object.entries(data.itemLinks).map(([key, val]) => {
+                                linksLoaded += Object.keys(val).length;
+                                return [key, new Map(Object.entries(val))];
+                            }));
+                        } else {
+                            itemLinks = new Map();
+                        }
+                        
+                        if (data.locationLinks) {
+                            locationLinks = new Map(Object.entries(data.locationLinks));
+                            linksLoaded += locationLinks.size;
+                        } else {
+                            locationLinks = new Map();
+                        }
+                        
+                        saveLinksToStorage();
+                        updateLinkCount();
+                        
+                        if (linksLoaded > 0) {
+                            showCustomAlert(`📤 ${linksLoaded} vínculos importados com sucesso! Execute a Análise para aplicar no relatório.`);
+                        } else {
+                            showCustomAlert(`ℹ️ Nenhum vínculo encontrado no arquivo importado. As vinculações atuais foram limpas.`);
+                        }
+
+                    } catch (error) {
+                        showCustomAlert(`❌ Erro ao processar o arquivo JSON: O arquivo pode estar corrompido ou no formato incorreto. Erro: ${error.message}`);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            input.click();
+        }
+        
+        // Função para remover um único link (chamada do Gerenciador de Links)
+        function removeLink(type, key1) {
+            // type: 'item|compositeKey' ou 'LOCAL_LINK'
+            // key1: invInstanceId (para item) ou invKey (para local)
+
+            if (type.startsWith('item|')) {
+                const compositeKey = type.split('|')[1];
+                if (itemLinks.has(compositeKey)) {
+                    const locationLinksMap = itemLinks.get(compositeKey); // Map<invInstanceId, sisInstanceId>
+                    // key1 é o invInstanceId
+                    locationLinksMap.delete(key1); 
+                    if (locationLinksMap.size === 0) {
+                        itemLinks.delete(compositeKey);
+                    }
+                }
+            } else if (type === 'LOCAL_LINK') {
+                // key1 é o invKey
+                locationLinks.delete(key1);
+            }
+
+            saveLinksToStorage();
+            updateLinkManagerDisplay(); // Atualiza o modal de gerenciamento
+            showCustomAlert('🗑️ Vínculo removido com sucesso! Execute a Análise para atualizar o relatório.');
+        }
+
         // === ANÁLISE PRINCIPAL ===
         
         async function runMasterCount() {
@@ -1713,9 +1825,9 @@
                 itemLinks.set(currentCompositeKey, new Map());
             }
             
-            const locationLinks = itemLinks.get(currentCompositeKey);
+            const locationLinksMap = itemLinks.get(currentCompositeKey); // Renomeada para evitar conflito
             // BUG FIX 2: Linka os IDs de Instância, não os IDs de Tombo
-            locationLinks.set(invInstanceId, sysInstanceId);
+            locationLinksMap.set(invInstanceId, sysInstanceId);
             
             saveLinksToStorage();
             
@@ -2326,7 +2438,7 @@
                                 <span class="mx-1 text-purple-600">🔗</span>
                                 <span class="font-semibold text-orange-700">Sis Instance ID: ${sysInstanceId}</span>
                             </div>
-                            <button onclick="removeLink('item|${compositeKey}', '${invInstanceId.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
+                            <button onclick="removeLink('item|${compositeKey}', '${invInstanceId.replace(/'/g, "\\'")}')" class="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
                                 🗑️
                             </button>
                         `;
@@ -2353,7 +2465,7 @@
                             <span class="mx-2 text-blue-600">🗺️ VINCULADO A</span>
                             <span class="font-bold text-orange-700">Sis: ${sysLocal.toUpperCase()} (${sysUnit.toUpperCase()})</span>
                         </div>
-                        <button onclick="removeLink('LOCAL_LINK', '${invKey.replace(/'/g, "\\'")}'); event.stopPropagation();" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
+                        <button onclick="removeLink('LOCAL_LINK', '${invKey.replace(/'/g, "\\'")}')" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
                             🗑️
                         </button>
                     `;
