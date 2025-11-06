@@ -1392,7 +1392,7 @@
             globalInventarioData.forEach(item => {
                 const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
                 
-                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA AUDITORIA
+                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA AUDITORIA E CONTAGEM
                 if (!isValidTombo(tombo)) {
                     // Adiciona um __instanceId para o item SEM Tombo, para fins de exportação final
                     item.__instanceId = `inv-${Date.now()}-${invItemCount}-${Math.floor(Math.random() * 10000)}`;
@@ -1439,15 +1439,24 @@
                 });
             });
             
-            // O Sistema não tem filtro de "S/T", pois a ausência de Tombo nele já indica um problema (Só Sistema).
+            // 3.1. Processamento de itens do SISTEMA (AGORA FILTRANDO POR isValidTombo PARA CONTAGEM SIMÉTRICA)
             let sisItemCount = 0;
             globalSistemaData.forEach(item => {
+                const tombo = sisIdCol ? (item[sisIdCol] || '').trim() : '';
+                
+                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA CONTAGEM
+                if (!isValidTombo(tombo)) {
+                    item.__instanceId = `sis-${Date.now()}-${sisItemCount}-${Math.floor(Math.random() * 10000)}`;
+                    sisItemCount++;
+                    return; // Ignora itens do Sistema sem Tombo válido na contagem
+                }
+
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = sisLocalCol ? (item[sisLocalCol] || 'sem local').trim() : 'sem local'; 
                 const compositeKey = `${unidade}|${normalizeString(local)}`;
                 
                 const localOriginal = local; 
-                const itemId = sisIdCol ? (item[sisIdCol] || `Item sem Tombo Sis-${Math.random()}`).trim() : `Item sem Tombo Sis-${Math.random()}`;
+                const itemId = tombo;
 
                 allCompositeKeys.add(compositeKey);
 
@@ -1487,7 +1496,7 @@
                 const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualInvKey: '' };
                 const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualSisKey: '' };
                 
-                // NOVO: A contagem agora reflete apenas itens com Tombo válido no Inventário
+                // NOVO: Ambas as contagens agora refletem APENAS itens com Tombo válido
                 const qtdInv = invData.count; 
                 const qtdSis = sisData.count; 
                 const diff = qtdInv - qtdSis;
@@ -1495,28 +1504,25 @@
                 let hasQuantityDivergence = diff !== 0;
                 let hasTombamentoDivergence = false;
 
-                // CRITICAL FIX: Filtra IDs "S/T" ou vazios da verificação de duplicidade de Tombo.
+                // Conjuntos de Tombos VÁLIDOS (normalizados)
                 const invIds = new Set(invData.items
-                    .filter(i => isValidTombo(i.itemId)) // Filtro redundante, mas garante
+                    .filter(i => isValidTombo(i.itemId))
                     .map(i => normalizeString(i.itemId)));
 
                 const sisIds = new Set(sisData.items
-                    .filter(i => isValidTombo(i.itemId)) // Apenas Tombos Válidos no Sistema
+                    .filter(i => isValidTombo(i.itemId))
                     .map(i => normalizeString(i.itemId)));
 
 
                 if (qtdInv > 0 || qtdSis > 0) {
-                    // IMPLEMENTAÇÃO DA LÓGICA DO USUÁRIO: A divergência de Tombo só é marcada se houver Tombo no Inventário que não está no Sistema.
-                    // Isso ignora Tombos "sobrando" no Sistema e diferenças em Tombos quando a QTD bate.
+                    // Lógica do Usuário: A divergência de Tombo só é marcada se houver Tombo no Inventário que não está no Sistema.
                     let invOnlyTombo = [...invIds].some(id => !sisIds.has(id)); 
                     
                     // hasTombamentoDivergence é True se um Tombo do Inventário está faltando no Sistema
                     hasTombamentoDivergence = invOnlyTombo; 
-
-                    // Se a Qtd for a mesma, mas os Tombos do Sis tivessem sobrado (Tombo no Sis que não está no Inv), isso seria ignorado aqui, 
-                    // a não ser que a Qtd não batesse (hasQuantityDivergence) - o que é o comportamento desejado pelo usuário.
                 }
                 
+                // O card só aparece se houver divergência de quantidade OU Tombo faltando no Sistema
                 if (hasQuantityDivergence || hasTombamentoDivergence) {
                     const auditRow = {
                         key: compositeKey,
@@ -1537,6 +1543,7 @@
                         unidade: auditRow.originalUnit,
                         normalizedUnitKey: auditRow.normalizedUnitKey, // BUG FIX 1
                         local: auditRow.originalLocal,
+                        // Item list contém TODOS os itens (válidos ou não) para serem exibidos no modal
                         invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), 
                         sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  
                         hasQuantityDivergence: hasQuantityDivergence,
