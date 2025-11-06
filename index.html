@@ -1392,62 +1392,58 @@
             globalInventarioData.forEach(item => {
                 const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
                 
-                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA AUDITORIA E CONTAGEM
-                if (!isValidTombo(tombo)) {
-                    // Adiciona um __instanceId para o item SEM Tombo, para fins de exportação final
-                    item.__instanceId = `inv-${Date.now()}-${invItemCount}-${Math.floor(Math.random() * 10000)}`;
-                    invItemCount++;
-                    return; // Ignora itens do Inventário sem Tombo válido
-                }
-                
+                // CRITICAL: Adiciona um __instanceId para TODOS os itens (incluindo inválidos) para a exportação final
+                const instanceId = `inv-${Date.now()}-${invItemCount}-${Math.floor(Math.random() * 10000)}`;
+                item.__instanceId = instanceId;
+                invItemCount++;
+
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = invLocalCol ? (item[invLocalCol] || 'sem local').trim() : 'sem local';
-                
-                const invCompositeKey = `${unidade}|${normalizeString(local)}`;
-                const mappedSisCompositeKey = locationLinks.get(invCompositeKey);
-                
-                // A chave de comparação é a chave do sistema mapeada, ou a própria chave do inventário (se não houver link)
-                const compositeKey = mappedSisCompositeKey || invCompositeKey;
-                
+
                 const localOriginal = local; 
                 const itemId = tombo;
                 
-                allCompositeKeys.add(compositeKey);
-                
-                if (!inventarioMap.has(compositeKey)) {
-                    inventarioMap.set(compositeKey, { 
-                        count: 0, 
-                        items: [],
-                        originalUnit: item[invUnitCol] || 'Sem Unidade', 
-                        originalLocal: localOriginal || 'Sem Local',
-                        actualInvKey: invCompositeKey
+                // NOVO FILTRO APLICADO AQUI: SÓ CONTA E MAPEIA ATIVOS COM TOMBO VÁLIDO PARA AUDITORIA
+                if (isValidTombo(tombo)) {
+                    const invCompositeKey = `${unidade}|${normalizeString(local)}`;
+                    const mappedSisCompositeKey = locationLinks.get(invCompositeKey);
+                    
+                    const compositeKey = mappedSisCompositeKey || invCompositeKey;
+                    allCompositeKeys.add(compositeKey);
+                    
+                    if (!inventarioMap.has(compositeKey)) {
+                        inventarioMap.set(compositeKey, { 
+                            count: 0, 
+                            items: [],
+                            originalUnit: item[invUnitCol] || 'Sem Unidade', 
+                            originalLocal: localOriginal || 'Sem Local',
+                            actualInvKey: invCompositeKey
+                        });
+                    }
+                    const data = inventarioMap.get(compositeKey);
+                    data.count++;
+                    
+                    data.items.push({ 
+                        instanceId: instanceId, 
+                        itemId: itemId, 
+                        data: item, 
+                        description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
+                        state: invStateCol ? (item[invStateCol] || '-').trim() : '-' 
                     });
                 }
-                const data = inventarioMap.get(compositeKey);
-                data.count++;
-                invItemCount++;
-                
-                // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
-                const instanceId = `inv-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`;
-                item.__instanceId = instanceId; // Armazena no objeto original para rastreamento
-                data.items.push({ 
-                    instanceId: instanceId, 
-                    itemId: itemId, 
-                    data: item, 
-                    description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
-                    state: invStateCol ? (item[invStateCol] || '-').trim() : '-' 
-                });
             });
             
-            // 3.1. Processamento de itens do SISTEMA (AGORA FILTRANDO POR isValidTombo PARA CONTAGEM SIMÉTRICA)
+            // 3.1. Processamento de itens do SISTEMA (FILTRANDO POR isValidTombo PARA CONTAGEM SIMÉTRICA)
             let sisItemCount = 0;
             globalSistemaData.forEach(item => {
                 const tombo = sisIdCol ? (item[sisIdCol] || '').trim() : '';
                 
-                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA CONTAGEM
+                const instanceId = `sis-${Date.now()}-${sisItemCount}-${Math.floor(Math.random() * 10000)}`;
+                item.__instanceId = instanceId;
+                sisItemCount++;
+
+                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA CONTAGEM E AUDITORIA
                 if (!isValidTombo(tombo)) {
-                    item.__instanceId = `sis-${Date.now()}-${sisItemCount}-${Math.floor(Math.random() * 10000)}`;
-                    sisItemCount++;
                     return; // Ignora itens do Sistema sem Tombo válido na contagem
                 }
 
@@ -1472,11 +1468,7 @@
                 const data = sistemaMap.get(compositeKey);
                 
                 data.count++;
-                sisItemCount++;
-
-                // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
-                const instanceId = `sis-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`;
-                item.__instanceId = instanceId; // Armazena no objeto original para rastreamento
+                
                 data.items.push({ 
                     instanceId: instanceId, 
                     itemId: itemId, 
@@ -1488,7 +1480,7 @@
 
             const sortedKeys = [...allCompositeKeys].sort();
 
-            // 4. Auditoria de Divergências (REQ 4: Locais sem divergência não são adicionados)
+            // 4. Auditoria de Divergências (Geração dos Cards)
             auditData = [];
             for (const compositeKey of sortedKeys) {
                 if (compositeKey === "sem unidade|sem local") continue;
@@ -1496,7 +1488,7 @@
                 const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualInvKey: '' };
                 const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualSisKey: '' };
                 
-                // NOVO: Ambas as contagens agora refletem APENAS itens com Tombo válido
+                // Ambas as contagens agora refletem APENAS itens com Tombo válido
                 const qtdInv = invData.count; 
                 const qtdSis = sisData.count; 
                 const diff = qtdInv - qtdSis;
@@ -1505,20 +1497,13 @@
                 let hasTombamentoDivergence = false;
 
                 // Conjuntos de Tombos VÁLIDOS (normalizados)
-                const invIds = new Set(invData.items
-                    .filter(i => isValidTombo(i.itemId))
-                    .map(i => normalizeString(i.itemId)));
-
-                const sisIds = new Set(sisData.items
-                    .filter(i => isValidTombo(i.itemId))
-                    .map(i => normalizeString(i.itemId)));
+                const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
+                const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
 
 
                 if (qtdInv > 0 || qtdSis > 0) {
-                    // Lógica do Usuário: A divergência de Tombo só é marcada se houver Tombo no Inventário que não está no Sistema.
+                    // Divergência de Tombo SÓ é marcada se houver Tombo no Inventário que não está no Sistema.
                     let invOnlyTombo = [...invIds].some(id => !sisIds.has(id)); 
-                    
-                    // hasTombamentoDivergence é True se um Tombo do Inventário está faltando no Sistema
                     hasTombamentoDivergence = invOnlyTombo; 
                 }
                 
@@ -1530,8 +1515,6 @@
                         local: invData.originalLocal || sisData.originalLocal,
                         originalUnit: invData.originalUnit || sisData.originalUnit,
                         originalLocal: invData.originalLocal || sisData.originalLocal,
-                        // BUG FIX 1: Adiciona chave de unidade normalizada para filtragem
-                        // CORRIGIDO: Utiliza a chave armazenada em invData.actualInvKey, ou a chave composta se for item SÓ do Sistema.
                         normalizedUnitKey: (invData.actualInvKey || compositeKey).split('|')[0], 
                         qtdInv: qtdInv,
                         qtdSis: qtdSis,
@@ -1541,9 +1524,9 @@
                     
                     discrepancyDetails.set(compositeKey, {
                         unidade: auditRow.originalUnit,
-                        normalizedUnitKey: auditRow.normalizedUnitKey, // BUG FIX 1
+                        normalizedUnitKey: auditRow.normalizedUnitKey, 
                         local: auditRow.originalLocal,
-                        // Item list contém TODOS os itens (válidos ou não) para serem exibidos no modal
+                        // Item list contém APENAS itens com Tombo Válido (para a ligação)
                         invItems: invData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)), 
                         sisItems: sisData.items.sort((a, b) => a.itemId.localeCompare(b.itemId)),  
                         hasQuantityDivergence: hasQuantityDivergence,
@@ -1557,7 +1540,6 @@
         }
 
         // NOVO: Função para obter status final de um item do inventário
-        // Recebe o mapa de Tombos disponíveis do Sistema (para match implícito)
         function getFinalStatus(invItemInstance, compositeKey, availableSysTombos) {
             const invTombo = normalizeString(invItemInstance.itemId);
             
@@ -1567,14 +1549,13 @@
             
             if (linkedSisId) {
                 // Remove o item vinculado do mapa de sistema para que ele não seja contado como disponível/sobra
-                // O linkedSisId é um instanceId. Procuramos o Tombo ID correspondente no mapa de availableSysTombos.
                 let matchedSysTombo = 'N/A';
                 
                 for(const [tomboKey, instanceIds] of availableSysTombos.entries()) {
                     const index = instanceIds.indexOf(linkedSisId);
                     if (index > -1) {
-                        matchedSysTombo = tomboKey; // Encontrou o Tombo normalizado
-                        instanceIds.splice(index, 1); // Remove o instanceId do array de disponíveis
+                        matchedSysTombo = tomboKey; 
+                        instanceIds.splice(index, 1); 
                         if (instanceIds.length === 0) {
                             availableSysTombos.delete(tomboKey);
                         }
@@ -1658,14 +1639,12 @@
                 const availableSysTombos = new Map(); // Map<normalizedTombo, List<instanceId>>
                 
                 globalSistemaData.forEach(item => {
-                    // ATENÇÃO: Se o item do Sistema não tem Tombo, ele não entra no pool de match Tombo-a-Tombo
                     const id = sisIdCol ? (item[sisIdCol] || '').trim() : '';
                     if (isValidTombo(id)) { // Só considera Tombos válidos (numericos) do Sistema
                         const normalizedId = normalizeString(id);
                         if (!availableSysTombos.has(normalizedId)) {
                             availableSysTombos.set(normalizedId, []);
                         }
-                        // O __instanceId foi preenchido por processAuditData
                         const instanceId = item.__instanceId; 
                         availableSysTombos.get(normalizedId).push(instanceId);
                     }
@@ -2271,34 +2250,82 @@
             
             const locationItemLinks = itemLinks.get(currentCompositeKey) || new Map();
             
-            const linkedInvIds = new Set(locationItemLinks.keys());
-            const linkedSisIds = new Set(locationItemLinks.values());
-
-            const filteredInvItems = rawInvItems
-                .filter(item => !linkedInvIds.has(item.instanceId)) 
-                .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
+            // Passo 1: Preparar pools de itens RESTANTES e Match Implícito (Tombo-a-Tombo)
             
-            const filteredSisItems = rawSisItems
-                .filter(item => !linkedSisIds.has(item.instanceId)) 
-                .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
+            // Itens já vinculados manualmente
+            const linkedInvIds = new Set(locationItemLinks.keys());
+            const linkedSysIds = new Set(locationItemLinks.values());
+
+            // Pool de Tombos do Sistema DISPONÍVEIS para Match Implícito
+            // Map<normalizedTombo, [instanceId1, instanceId2, ...]>
+            const availableSysTomboPool = new Map();
+
+            // Pools de itens restantes para processamento
+            const remainingInv = rawInvItems.filter(item => !linkedInvIds.has(item.instanceId));
+            const remainingSys = rawSisItems.filter(item => !linkedSysIds.has(item.instanceId));
+
+            // Popula o pool de Tombos do Sistema DISPONÍVEL (apenas os restantes)
+            remainingSys.forEach(item => {
+                const normalizedTombo = normalizeString(item.itemId);
+                if (!availableSysTomboPool.has(normalizedTombo)) {
+                    availableSysTomboPool.set(normalizedTombo, []);
+                }
+                availableSysTomboPool.get(normalizedTombo).push(item.instanceId);
+            });
+
+
+            // Passo 2: Aplicar Match Implícito e filtrar as listas de exibição (mantendo apenas os órfãos)
+            
+            const filteredInvItems = [];
+            const filteredSysInstancesToKeep = new Set(); // Guarda os instanceIds do Sis que não fizeram match (sobras)
+            const matchedInvInstances = new Set(); // Guarda os instanceIds do Inv que fizeram match
+
+            // 2.1 Processa Inventário: Tenta casar com o pool do Sistema
+            remainingInv.forEach(item => {
+                const normalizedTombo = normalizeString(item.itemId);
                 
+                // Se o Tombo existir no pool e houver instâncias disponíveis
+                if (availableSysTomboPool.has(normalizedTombo) && availableSysTomboPool.get(normalizedTombo).length > 0) {
+                    // Match implícito! Remove uma instância do Sistema do pool
+                    availableSysTomboPool.get(normalizedTombo).shift();
+                    matchedInvInstances.add(item.instanceId);
+                    // Não adiciona à lista de exibição (é um item "Correto" / Match)
+                } else {
+                    // Item órfão no Inventário (Faltante no Sis ou Tombo diferente)
+                    filteredInvItems.push(item);
+                }
+            });
+
+            // 2.2 Processa Sistema: Adiciona as sobras do pool (Itens que sobraram no Sis)
+            availableSysTomboPool.forEach(instanceIds => {
+                instanceIds.forEach(instanceId => {
+                    filteredSysInstancesToKeep.add(instanceId);
+                });
+            });
+            
+            const filteredSysItems = remainingSys.filter(item => filteredSysInstancesToKeep.has(item.instanceId));
+
+
+            // Passo 3: Renderização (agora com as listas filtradas)
+
+            // Lógica para detectar duplicidade de Tombo nos itens RESTANTES (para o badge)
             const countTomboInv = new Map();
             filteredInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
             const countTomboSis = new Map();
-            filteredSisItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
+            filteredSysItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
 
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
-                <span>Inventário (${filteredInvItems.length} item(s) restante(s))</span>
+                <span>Inventário (${filteredInvItems.length} item(s) restante(s) p/ vincular)</span>
             `;
             document.getElementById('modal-sis-title').innerHTML = `
                 <span class="text-2xl">⚙️</span>
-                <span>Sistema (${filteredSisItems.length} item(s) restante(s))</span>
+                <span>Sistema (${filteredSysItems.length} item(s) restante(s) p/ vincular)</span>
             `;
 
             invList.innerHTML = '';
             if (filteredInvItems.length === 0) {
-                invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
+                invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum Tombo do Inventário para vincular.</li>';
             } else {
                 filteredInvItems.forEach((itemData, index) => {
                     const { instanceId, itemId, description, state } = itemData;
@@ -2336,10 +2363,10 @@
             }
 
             sisList.innerHTML = '';
-            if (filteredSisItems.length === 0) {
-                sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
+            if (filteredSysItems.length === 0) {
+                sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum Tombo do Sistema para vincular.</li>';
             } else {
-                filteredSisItems.forEach((itemData, index) => {
+                filteredSysItems.forEach((itemData, index) => {
                     const { instanceId, itemId, description, state } = itemData;
                     
                     const li = document.createElement('li');
