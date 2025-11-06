@@ -824,7 +824,7 @@
                         <button 
                             id="btn-remove-local"
                             onclick="removeLocalLink()" 
-                            class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition"
+                            class="px-6 py-3 bg-red-600 hover:bg-red-600 text-white font-bold rounded-xl transition"
                             disabled
                         >
                             🗑️ Remover Vínculo
@@ -1030,27 +1030,35 @@
             document.getElementById('alert-btn-ok').onclick = closeAlert;
         }
 
-        
+        // *** ALTERAÇÃO PRINCIPAL (IGNORAR ZEROS À ESQUERDA) ***
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
             
             const baseStr = str
                 .toLowerCase()
                 .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[-/.,;:()]/g, ' ') 
-                .replace(/\s+/g, ' ')
+                .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+                .replace(/[-/.,;:()]/g, ' ') // Remove pontuação comum
+                .replace(/\s+/g, ' ') // Substitui múltiplos espaços por um
                 .trim(); 
             
-            // NOVO: Se for um Tombo VÁLIDO (ou seja, só números e separadores, após a limpeza básica), 
-            // removemos zeros à esquerda para a comparação.
-            // Nota: O teste regex aqui deve ser o mais simples possível para evitar recursão
-            const numericTest = baseStr.replace(/[^0-9]/g, '');
-            if (numericTest.length > 0 && /^[0-9]+$/.test(numericTest)) {
-                 // Remove separadores para a conversão e remove zeros à esquerda
-                 return numericTest.replace(/^0+/, ''); 
+            // Verifica se a string base se parece com um número (pode conter espaços onde havia pontuação)
+            // Ex: "0140.32425" vira "0140 32425"
+            // Ex: "14032426" vira "14032426"
+            
+            // Remove todos os não-dígitos para testar se é um número
+            const numericOnly = baseStr.replace(/[^0-9]/g, '');
+
+            // Se for um Tombo VÁLIDO (ou seja, contém dígitos e é majoritariamente numérico)
+            if (isValidTombo(str) && numericOnly.length > 0) {
+                 // Remove os zeros à esquerda APENAS do conteúdo numérico
+                 // "014032425" -> "14032425"
+                 // "S/T" -> não entra aqui
+                 // "CADEIRA" -> não entra aqui
+                 return numericOnly.replace(/^0+/, ''); 
             }
             
+            // Se não for um tombamento numérico, retorna a normalização de texto padrão
             return baseStr;
         }
 
@@ -1079,9 +1087,10 @@
                 }
             });
             
-            if (maxCount === 0) {
-                 // Se não encontrou separador, a primeira linha inteira será o cabeçalho.
-                 // Isso forçará o erro de validação de colunas se os dados não estiverem formatados.
+            if (maxCount === 0 && lines.length > 1) {
+                 // Se não encontrou separador e tem mais de uma linha, algo está errado
+                 // Mas continuamos assumindo que a primeira linha é o cabeçalho
+                 console.warn("Nenhum separador comum (Tab, ;, , |) detectado na primeira linha.");
             }
             
             const rawHeaders = lines[0].split(separator).map(h => h.trim()).filter(h => h.length > 0);
@@ -1258,6 +1267,8 @@
         function isValidTombo(id) {
             if (typeof id !== 'string') return false;
             const trimmedId = id.trim();
+            
+            // 1. Regras de exclusão estritas (palavras ou códigos óbvios)
             const normalized = trimmedId
                 .toLowerCase()
                 .normalize("NFD")
@@ -1265,13 +1276,13 @@
                 .replace(/[-/.,;:()]/g, ' ') 
                 .replace(/\s+/g, ' ')
                 .trim();
-
-            // 1. Regras de exclusão estritas (palavras ou códigos óbvios)
+                
             if (normalized === 's t' || normalized === 'st' || normalized === 'permuta' || normalized.includes('nao tem') || normalized === 's' || normalized === 't') {
                 return false;
             }
 
             // 2. Regra de inclusão: Deve conter pelo menos um dígito e ser composto majoritariamente por caracteres numéricos ou delimitadores de número (., -).
+            // Permite "123.456-7" ou "123456"
             return /^[0-9\.\-]*[0-9]+[0-9\.\-]*$/.test(trimmedId);
         }
 
@@ -1440,7 +1451,7 @@
                     
                     data.items.push({ 
                         instanceId: instanceId, 
-                        itemId: itemId, 
+                        itemId: itemId, // Armazena o ID original (com zeros)
                         data: item, 
                         description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
                         state: invStateCol ? (item[invStateCol] || '-').trim() : '-' 
@@ -1467,7 +1478,7 @@
                 const compositeKey = `${unidade}|${normalizeString(local)}`;
                 
                 const localOriginal = local; 
-                const itemId = tombo;
+                const itemId = tombo; // Armazena o ID original
 
                 allCompositeKeys.add(compositeKey);
 
@@ -1486,7 +1497,7 @@
                 
                 data.items.push({ 
                     instanceId: instanceId, 
-                    itemId: itemId, 
+                    itemId: itemId, // Armazena o ID original
                     data: item,
                     description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
                     state: sisStateCol ? (item[sisStateCol] || '-').trim() : '-' 
@@ -1511,13 +1522,18 @@
                 let hasQuantityDivergence = diff !== 0;
                 let hasTombamentoDivergence = false;
 
+                // *** CORREÇÃO APLICADA AQUI ***
                 // Conjuntos de Tombos VÁLIDOS (normalizados e com zeros à esquerda removidos)
+                // A função normalizeString() agora cuida da remoção dos zeros.
                 const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
                 const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
 
 
                 if (qtdInv > 0 || qtdSis > 0) {
                     // Divergência de Tombo SÓ é marcada se houver Tombo no Inventário que não está no Sistema.
+                    // Ex: Inv [1, 2], Sis [1, 3]. Tem divergência (item 2 falta no Sis)
+                    // Ex: Inv [1, 2], Sis [1, 2]. Não tem divergência.
+                    // Ex: Inv [1, 2], Sis [1, 2, 3]. Não tem divergência (item 3 sobra, mas isso é pego pela Qtd)
                     let invOnlyTombo = [...invIds].some(id => !sisIds.has(id)); 
                     hasTombamentoDivergence = invOnlyTombo; 
                 }
@@ -1556,7 +1572,8 @@
 
         // NOVO: Função para obter status final de um item do inventário
         function getFinalStatus(invItemInstance, compositeKey, availableSysTombos) {
-            const invTombo = normalizeString(invItemInstance.itemId);
+            // *** CORREÇÃO APLICADA AQUI ***
+            const invTombo = normalizeString(invItemInstance.itemId); // Usa o tombo normalizado (sem zeros)
             
             // 1. Checa se o item foi explicitamente vinculado (via itemLinks)
             const locationLinksMap = itemLinks.get(compositeKey) || new Map();
@@ -1569,7 +1586,7 @@
                 for(const [tomboKey, instanceIds] of availableSysTombos.entries()) {
                     const index = instanceIds.indexOf(linkedSisId);
                     if (index > -1) {
-                        matchedSysTombo = tomboKey; 
+                        matchedSysTombo = tomboKey; // tomboKey já é normalizado
                         instanceIds.splice(index, 1); 
                         if (instanceIds.length === 0) {
                             availableSysTombos.delete(tomboKey);
@@ -1592,13 +1609,14 @@
             }
             
             // 2. Checa se o Tombo faz um match direto (implícito) e está disponível
+            // Compara o tombo normalizado do inventário (invTombo) com as chaves do pool (que são normalizadas)
             if (availableSysTombos.has(invTombo) && availableSysTombos.get(invTombo).length > 0) {
                 // Pega a primeira instância disponível para este Tombo
                 const sisInstanceId = availableSysTombos.get(invTombo).shift(); 
                 
                 // Se a lista de instâncias para este Tombo ficar vazia, remove a chave
                 if (availableSysTombos.get(invTombo).length === 0) {
-                    availableSysTombos.delete(tomboKey);
+                    availableSysTombos.delete(invTombo); // Usa a chave normalizada 'invTombo'
                 }
 
                 // O Tombo Aplicado deve ser o Tombo ORIGINAL do Sistema, não o normalizado
@@ -1617,7 +1635,7 @@
             // 3. Faltante
             return { 
                 status: 'Faltante', 
-                newTombo: invItemInstance.itemId,
+                newTombo: invItemInstance.itemId, // Mantém o tombo original do inventário
                 sisKey: 'N/A' 
             };
         }
@@ -1656,7 +1674,7 @@
                 globalSistemaData.forEach(item => {
                     const id = sisIdCol ? (item[sisIdCol] || '').trim() : '';
                     if (isValidTombo(id)) { // Só considera Tombos válidos (numericos) do Sistema
-                        const normalizedId = normalizeString(id);
+                        const normalizedId = normalizeString(id); // *** CORREÇÃO APLICADA AQUI ***
                         if (!availableSysTombos.has(normalizedId)) {
                             availableSysTombos.set(normalizedId, []);
                         }
@@ -1683,7 +1701,7 @@
                     
                     const invItemInstance = {
                         instanceId: instanceId,
-                        itemId: tombo, 
+                        itemId: tombo, // Passa o ID original
                         data: item,
                         isTomboValid: isTomboValid,
                         compositeKey: finalCompositeKey,
@@ -2028,12 +2046,13 @@
             updateSummaryUI(totalInv, totalSis, totalInv - totalSis);
             document.getElementById('discrepancy-count').textContent = discrepancyCount;
             
-            const unitText = selectedUnit === 'all_divergent' ? 'Todas as Unidades Divergentes' : discrepancyDetails.values().next().value?.unidade.toUpperCase() || 'RELATÓRIO GERAL';
+            const unitText = selectedUnit === 'all_divergent' ? 'Todas as Unidades Divergentes' : (groupedDetails.size > 0 ? groupedDetails.values().next().value.name.toUpperCase() : 'RELATÓRIO GERAL');
             document.getElementById('report-title').innerHTML = `
                 <span class="text-4xl">📈</span>
                 <span>Relatório: ${unitText}</span>
             `;
         }
+
 
         function createDiscrepancyCard(details, compositeKey) {
             const item = details;
@@ -2225,12 +2244,15 @@
                 const invListCount = document.getElementById('modal-inv-list').querySelectorAll('li').length;
                 const sisListCount = document.getElementById('modal-sis-list').querySelectorAll('li').length;
                 
-                if (invListCount === 0 && sisListCount === 0) {
-                    showCustomAlert('✅ Vínculo criado e divergência resolvida! Reanalisando a tabela...');
-                    closeModal();
-                    runMasterCount(); 
-                    return;
-                }
+                // *** CORREÇÃO: A lógica anterior de fechar o modal estava errada ***
+                // Agora, apenas re-renderiza e mostra o alerta
+                
+                // if (invListCount === 0 && sisListCount === 0) {
+                //     showCustomAlert('✅ Vínculo criado e divergência resolvida! Reanalisando a tabela...');
+                //     closeModal();
+                //     runMasterCount(); 
+                //     return;
+                // }
 
                 showCustomAlert(`✅ Vínculo criado!\n📋 Inventário Tombo: ${invTombo}\n⚙️ Sistema Tombamento: ${sysTombo}`);
             }
@@ -2254,10 +2276,11 @@
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-100');
-                modalContent.classList.add('scale-95');
+                modalContent.classList.remove('scale-95'); // Corrigido de scale-100 para scale-95 (início da animação)
+                modalContent.classList.add('scale-100'); // Adiciona a classe final
             }, 10);
         }
+
 
         function renderModalLists(rawInvItems, rawSisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
@@ -2285,7 +2308,7 @@
 
             // Popula o pool de Tombos do Sistema DISPONÍVEL (apenas os restantes)
             remainingSys.forEach(item => {
-                const normalizedTombo = normalizeString(item.itemId);
+                const normalizedTombo = normalizeString(item.itemId); // *** CORREÇÃO APLICADA AQUI ***
                 // IMPORTANTE: Só adiciona ao pool de match Tombos VÁLIDOS do Sistema
                 if (isValidTombo(item.itemId)) {
                     if (!availableSysTomboPool.has(normalizedTombo)) {
@@ -2304,7 +2327,7 @@
 
             // 2.1 Processa Inventário: Tenta casar com o pool do Sistema
             remainingInv.forEach(item => {
-                const normalizedTombo = normalizeString(item.itemId);
+                const normalizedTombo = normalizeString(item.itemId); // *** CORREÇÃO APLICADA AQUI ***
                 
                 // Se o Tombo existir no pool e houver instâncias disponíveis
                 if (availableSysTomboPool.has(normalizedTombo) && availableSysTomboPool.get(normalizedTombo).length > 0) {
@@ -2328,17 +2351,26 @@
             const filteredSysItems = remainingSys.filter(item => filteredSysInstancesToKeep.has(item.instanceId));
 
             // Filtro de busca na tela
+            // *** CORREÇÃO APLICADA AQUI *** (busca pelo ID original, não normalizado)
+            const normalizedSearch = normalizeString(searchTerm);
             const finalInvItems = filteredInvItems.filter(item => 
-                !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm))
+                !searchTerm || 
+                normalizeString(item.itemId).includes(normalizedSearch) || // Busca no ID normalizado
+                item.itemId.includes(searchTerm) || // Busca no ID original
+                normalizeString(item.description).includes(normalizedSearch)
             );
             const finalSysItems = filteredSysItems.filter(item => 
-                !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm))
+                !searchTerm || 
+                normalizeString(item.itemId).includes(normalizedSearch) || // Busca no ID normalizado
+                item.itemId.includes(searchTerm) || // Busca no ID original
+                normalizeString(item.description).includes(normalizedSearch)
             );
 
 
             // Passo 3: Renderização (agora com as listas filtradas)
 
             // Lógica para detectar duplicidade de Tombo nos itens RESTANTES (para o badge)
+            // *** CORREÇÃO APLICADA AQUI *** (usa o ID original para o map)
             const countTomboInv = new Map();
             finalInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
             const countTomboSis = new Map();
@@ -2376,7 +2408,7 @@
                     } else if (tomboCount > 1) {
                         badgeText = `⚠️ DUPLICIDADE DE TOMBO (${itemId}) - ${tomboCount} Instâncias`;
                     } else {
-                        badgeText = `A VINCULAR (Tombo: ${itemId})`;
+                        badgeText = `A VINCULAR (Tombo: ${itemId})`; // Mostra o ID original
                     }
 
                     li.innerHTML = `
@@ -2415,7 +2447,7 @@
                     } else if (tomboCount > 1) {
                         badgeText = `⚠️ DUPLICIDADE DE TOMBAMENTO (${itemId}) - ${tomboCount} Instâncias`;
                     } else {
-                        badgeText = `A VINCULAR (Tombamento: ${itemId})`;
+                        badgeText = `A VINCULAR (Tombamento: ${itemId})`; // Mostra o ID original
                     }
 
                     li.innerHTML = `
@@ -2612,7 +2644,8 @@
                     let targetName = 'Sem Mapeamento';
                     
                     if (linkedSisKey) {
-                        
+                        targetName = allUniqueLocations.sis.get(linkedSisKey)?.local || 'Vínculo Quebrado';
+                        badge = `<span class="status-badge bg-green-200 text-green-800 ml-2">Vinculado: ${targetName}</span>`;
                     } else if (suggestedSisKey) {
                          targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
                          badge = `<span class="status-badge bg-yellow-200 text-yellow-800 ml-2">Sugestão: ${targetName}</span>`;
@@ -2649,18 +2682,20 @@
             }
         }
 
+
         function autoMapLocations(invLocs, sisLocs) {
             const suggestions = new Map();
             const sisNormMap = new Map(sisLocs.map(loc => [normalizeString(loc.local), loc.key]));
 
             invLocs.forEach(invLoc => {
-                const normInv = normalizeString(loc.local);
+                const normInv = normalizeString(invLoc.local); // Corrigido de loc.local para invLoc.local
                 if (sisNormMap.has(normInv)) {
                     suggestions.set(invLoc.key, sisNormMap.get(normInv));
                 }
             });
             return suggestions;
         }
+
 
         function selectLocalForAuditing(event, invKey) {
             currentAuditedInvKey = invKey;
@@ -2683,12 +2718,26 @@
             const linkedSisKey = locationLinks.get(invKey) || autoMapSuggestions.get(invKey);
             
             if (linkedSisKey) {
-                const sisLi = document.querySelector(`#local-sis-list li[data-key="${linkedSisKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`);
-                if (sisLi) {
-                    sisLi.classList.add('location-selected');
+                // Tenta encontrar o item na lista de 'remainingSis'
+                let sisLi = document.querySelector(`#local-sis-list li[data-key="${linkedSisKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`);
+                
+                if (!sisLi && locationLinks.has(invKey)) {
+                    // Se não está na lista de 'remainingSis' (porque já está vinculado),
+                    // destacamos o item vinculado do Inventário e atualizamos o status
+                    invLi.innerHTML = `
+                        <div class="font-semibold text-base">${invLoc.local}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Destino: <span class="font-bold text-gray-700">${allUniqueLocations.sis.get(linkedSisKey)?.local || 'Vínculo Quebrado'}</span>
+                        </div>
+                        <div class="mt-1"><span class="status-badge bg-green-200 text-green-800 ml-2">Vinculado</span></div>
+                    `;
+                    statusText.textContent = `Vinculado: ${invLoc.local} ➔ ${allUniqueLocations.sis.get(linkedSisKey)?.local}`;
+                } else if (sisLi) {
+                     sisLi.classList.add('location-selected');
                 }
             }
         }
+
         
         function selectLocalForMapping(event, sisKey) {
              const sisLi = event.target.closest('li');
@@ -2853,14 +2902,18 @@
                 locationLinks.forEach((sysKey, invKey) => {
                     const [invUnit, invLocal] = invKey.split('|');
                     const [sysUnit, sysLocal] = sysKey.split('|');
+                    
+                    // Tenta buscar o nome original (pode falhar se os dados não estiverem carregados)
+                    const invOriginal = allUniqueLocations.inv.get(invKey)?.local || invLocal.toUpperCase();
+                    const sisOriginal = allUniqueLocations.sis.get(sysKey)?.local || sysLocal.toUpperCase();
 
                     const linkItem = document.createElement('div');
                     linkItem.className = 'flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-200 shadow-sm';
                     linkItem.innerHTML = `
                         <div class="flex-1 text-sm">
-                            <span class="font-bold text-blue-700">Inv: ${invLocal.toUpperCase()} (${invUnit.toUpperCase()})</span>
+                            <span class="font-bold text-blue-700">Inv: ${invOriginal} (${invUnit.toUpperCase()})</span>
                             <span class="mx-2 text-blue-600">🗺️ VINCULADO A</span>
-                            <span class="font-bold text-orange-700">Sis: ${sysLocal.toUpperCase()} (${sysUnit.toUpperCase()})</span>
+                            <span class="font-bold text-orange-700">Sis: ${sisOriginal} (${sysUnit.toUpperCase()})</span>
                         </div>
                         <button onclick="removeLink('LOCAL_LINK', '${invKey.replace(/'/g, "\\'")}')" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition">
                             🗑️
