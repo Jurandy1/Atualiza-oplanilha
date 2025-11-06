@@ -1105,7 +1105,7 @@
 
         function updateDataCount() {
             const invTextarea = document.getElementById('list-inventario');
-            const sisTextarea = document.getElementById('list-sistema');
+            const sistemaTextarea = document.getElementById('list-sistema');
             
             const invLines = invTextarea.value.trim().split('\n').filter(Boolean).length;
             const sisLines = sisTextarea.value.trim().split('\n').filter(Boolean).length;
@@ -2168,16 +2168,19 @@
                 .filter(loc => loc.key.startsWith(normalizedUnit + '|'))
                 .sort((a, b) => a.local.localeCompare(b.local));
             
-            // REQ 1: Atualiza contadores
-            // Os contadores devem refletir o total de locais na unidade, não apenas os não mapeados.
-            invCountSpan.textContent = `${filteredInv.length} Locais`;
-            sisCountSpan.textContent = `${filteredSis.length} Locais`;
-
             // 3. Auto-mapeamento (sugestão)
             autoMapSuggestions = autoMapLocations(filteredInv, filteredSis);
 
             // 4. Renderiza lista de Inventário (Origem)
-            const remainingInv = filteredInv.filter(loc => !locationLinks.has(loc.key)); // Filtra locais já mapeados (REQ 1)
+            const remainingInv = filteredInv.filter(loc => !locationLinks.has(loc.key)); // Filtra locais já mapeados (Origem)
+
+            // NOVO: 5. Filtra locais de Sistema (Destino) que JÁ foram vinculados
+            const linkedSisKeys = new Set([...locationLinks.values()]);
+            const remainingSis = filteredSis.filter(loc => !linkedSisKeys.has(loc.key)); // Filtra locais já mapeados (Destino)
+
+            // REQ 1: Atualiza contadores para exibir os "restantes"
+            invCountSpan.textContent = `${remainingInv.length} Locais restantes`;
+            sisCountSpan.textContent = `${remainingSis.length} Locais restantes`;
 
             if (remainingInv.length === 0) {
                  invList.innerHTML = '<li class="text-gray-500 italic p-3">Todos os locais desta unidade foram auditados e vinculados.</li>';
@@ -2188,7 +2191,7 @@
                     li.setAttribute('onclick', `selectLocalForAuditing(event, '${loc.key.replace(/'/g, "\\'")}')`);
                     li.dataset.key = loc.key; 
                     
-                    const linkedSisKey = locationLinks.get(loc.key); // Já sabemos que é null, mas mantém a estrutura
+                    const linkedSisKey = locationLinks.get(loc.key); 
                     const suggestedSisKey = autoMapSuggestions.get(loc.key);
                     let badge = '';
                     let targetName = 'Sem Mapeamento';
@@ -2214,11 +2217,11 @@
                 });
             }
 
-            // 5. Renderiza lista de Sistema (Destino) - Não deve ser filtrada por estado de vínculo
-             if (filteredSis.length === 0) {
-                 sisList.innerHTML = '<li class="text-gray-500 italic p-3">Nenhum local de sistema encontrado para esta unidade.</li>';
+            // 6. Renderiza lista de Sistema (Destino) - AGORA SÓ MOSTRA OS RESTANTES
+             if (remainingSis.length === 0) {
+                 sisList.innerHTML = '<li class="text-gray-500 italic p-3">Todos os locais do Sistema desta unidade foram mapeados como destino.</li>';
             } else {
-                filteredSis.forEach(loc => {
+                remainingSis.forEach(loc => {
                     const li = document.createElement('li');
                     li.className = `p-3 bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer`;
                     li.setAttribute('onclick', `selectLocalForMapping(event, '${loc.key.replace(/'/g, "\\'")}')`);
