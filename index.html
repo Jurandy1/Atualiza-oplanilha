@@ -1245,7 +1245,7 @@
 
         // NOVO: Função para validar se o ID é um Tombo (apenas números, com tolerância a separadores)
         function isValidTombo(id) {
-            if (typeof id !== 'string' || id.trim() === '') return false;
+            if (typeof id !== 'string') return false;
             const trimmedId = id.trim();
             const normalized = normalizeString(trimmedId);
 
@@ -1506,14 +1506,15 @@
 
 
                 if (qtdInv > 0 || qtdSis > 0) {
-                    let invOnly = [...invIds].some(id => !sisIds.has(id));
-                    let sisOnly = [...sisIds].some(id => !invIds.has(id));
+                    // IMPLEMENTAÇÃO DA LÓGICA DO USUÁRIO: A divergência de Tombo só é marcada se houver Tombo no Inventário que não está no Sistema.
+                    // Isso ignora Tombos "sobrando" no Sistema e diferenças em Tombos quando a QTD bate.
+                    let invOnlyTombo = [...invIds].some(id => !sisIds.has(id)); 
                     
-                    if (qtdInv === qtdSis && [...invIds].length !== [...sisIds].length) {
-                         hasTombamentoDivergence = true;
-                    } else if (invOnly || sisOnly) {
-                         hasTombamentoDivergence = true;
-                    }
+                    // hasTombamentoDivergence é True se um Tombo do Inventário está faltando no Sistema
+                    hasTombamentoDivergence = invOnlyTombo; 
+
+                    // Se a Qtd for a mesma, mas os Tombos do Sis tivessem sobrado (Tombo no Sis que não está no Inv), isso seria ignorado aqui, 
+                    // a não ser que a Qtd não batesse (hasQuantityDivergence) - o que é o comportamento desejado pelo usuário.
                 }
                 
                 if (hasQuantityDivergence || hasTombamentoDivergence) {
@@ -2059,7 +2060,7 @@
                 diffClass = 'text-gray-700';
                 borderColor = 'border-yellow-400';
                 icon = '🔄'; 
-                divergenceWarning = '<span class="status-badge bg-yellow-200 text-yellow-800">⚠️ Tombo Divergente (Qtd. OK)</span>';
+                divergenceWarning = '<span class="status-badge bg-yellow-200 text-yellow-800">⚠️ Tombo Divergente (Faltante no Sis)</span>';
             }
             
             const diffText = `${item.diff > 0 ? '+' : ''}${item.diff}`;
@@ -2375,8 +2376,8 @@
             } else if (details.hasQuantityDivergence) {
                 subtitle += ' | ⚠️ Divergência de Quantidade';
             } else if (details.hasTombamentoDivergence) {
-                subtitle += ' | 🔄 Divergência de Tombo (Qtd. OK)';
-                linkingMessage = 'Esse local não tem divergência de quantidade. Vincule os IDs soltos (Tombo/Tombamento) para finalizar a ligação.'; 
+                subtitle += ' | 🔄 Tombo Faltante (No Inventário)';
+                linkingMessage = 'Esse local pode ter Tombo(s) que o Sistema não reconheceu. Vincule os IDs para resolver o Tombo Faltante.'; 
             }
             
             document.getElementById('modal-subtitle').textContent = subtitle;
