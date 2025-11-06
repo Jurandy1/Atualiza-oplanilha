@@ -1033,14 +1033,25 @@
         
         function normalizeString(str) {
             if (typeof str !== 'string') return '';
-            // APLICA TRIM e remove acentos e substitui pontuações por espaço, e espaços múltiplos por um único espaço
-            return str
+            
+            const baseStr = str
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[-/.,;:()]/g, ' ') // Substitui pontuações por espaço
+                .replace(/[-/.,;:()]/g, ' ') 
                 .replace(/\s+/g, ' ')
-                .trim(); // Garante que não há espaços iniciais/finais após a limpeza
+                .trim(); 
+            
+            // NOVO: Se for um Tombo VÁLIDO (ou seja, só números e separadores, após a limpeza básica), 
+            // removemos zeros à esquerda para a comparação.
+            // Nota: O teste regex aqui deve ser o mais simples possível para evitar recursão
+            const numericTest = baseStr.replace(/[^0-9]/g, '');
+            if (numericTest.length > 0 && /^[0-9]+$/.test(numericTest)) {
+                 // Remove separadores para a conversão e remove zeros à esquerda
+                 return numericTest.replace(/^0+/, ''); 
+            }
+            
+            return baseStr;
         }
 
         function parseData(text) {
@@ -1247,16 +1258,20 @@
         function isValidTombo(id) {
             if (typeof id !== 'string') return false;
             const trimmedId = id.trim();
-            const normalized = normalizeString(trimmedId);
+            const normalized = trimmedId
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[-/.,;:()]/g, ' ') 
+                .replace(/\s+/g, ' ')
+                .trim();
 
             // 1. Regras de exclusão estritas (palavras ou códigos óbvios)
-            // Se o usuário colou Permuta, S/T, s/t, etc., ignora.
             if (normalized === 's t' || normalized === 'st' || normalized === 'permuta' || normalized.includes('nao tem') || normalized === 's' || normalized === 't') {
                 return false;
             }
 
             // 2. Regra de inclusão: Deve conter pelo menos um dígito e ser composto majoritariamente por caracteres numéricos ou delimitadores de número (., -).
-            // A regra do usuário é "Tombos são só NUMEROS." - Aceita apenas números, e separa/pontuações que acompanham números.
             return /^[0-9\.\-]*[0-9]+[0-9\.\-]*$/.test(trimmedId);
         }
 
@@ -1496,7 +1511,7 @@
                 let hasQuantityDivergence = diff !== 0;
                 let hasTombamentoDivergence = false;
 
-                // Conjuntos de Tombos VÁLIDOS (normalizados)
+                // Conjuntos de Tombos VÁLIDOS (normalizados e com zeros à esquerda removidos)
                 const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
                 const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
 
@@ -2639,7 +2654,7 @@
             const sisNormMap = new Map(sisLocs.map(loc => [normalizeString(loc.local), loc.key]));
 
             invLocs.forEach(invLoc => {
-                const normInv = normalizeString(invLoc.local);
+                const normInv = normalizeString(loc.local);
                 if (sisNormMap.has(normInv)) {
                     suggestions.set(invLoc.key, sisNormMap.get(normInv));
                 }
