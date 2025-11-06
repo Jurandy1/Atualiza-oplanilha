@@ -1345,13 +1345,18 @@
             // 2. Pré-coleta de Locais Únicos (para o Modal de Local Linking)
             allUniqueLocations = { inv: new Map(), sis: new Map() };
             
+            // ATUALIZAÇÃO PRINCIPAL: Ignora itens do Inventário sem Tombo válido na coleta de Locais Únicos
             globalInventarioData.forEach(item => {
-                const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
-                const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
-                // CRIA A CHAVE NORMALIZADA (UNIFICANDO AS DUPLICAÇÕES)
-                const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
-                if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
-                    allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
+                const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
+                // Condição de filtro: Só considera se o Tombo não for vazio e nem "S/T" (case insensitive)
+                if (tombo.length > 0 && normalizeString(tombo) !== 's t') { 
+                    const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
+                    const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    // CRIA A CHAVE NORMALIZADA (UNIFICANDO AS DUPLICAÇÕES)
+                    const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                    if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
+                        allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
+                    }
                 }
             });
             globalSistemaData.forEach(item => {
@@ -1367,6 +1372,12 @@
 
             // 3. Processamento e Aplicação de Vínculos de Local
             globalInventarioData.forEach(item => {
+                const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
+                // FILTRO DE ATIVO AQUI TAMBÉM: Ignora itens do Inventário sem Tombo válido
+                if (tombo.length === 0 || normalizeString(tombo) === 's t') {
+                    return; // Ignora itens do Inventário sem Tombo/S/T
+                }
+                
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = invLocalCol ? (item[invLocalCol] || 'sem local').trim() : 'sem local';
                 
@@ -1377,7 +1388,7 @@
                 const compositeKey = mappedSisCompositeKey || invCompositeKey;
                 
                 const localOriginal = local; 
-                const itemId = invIdCol ? (item[invIdCol] || `Item sem Tombo Inv-${Math.random()}`).trim() : `Item sem Tombo Inv-${Math.random()}`;
+                const itemId = tombo || `Item sem Tombo Inv-${Math.random()}`;
                 
                 allCompositeKeys.add(compositeKey);
                 
@@ -1403,6 +1414,7 @@
                 });
             });
             
+            // O Sistema não tem filtro de "S/T", pois a ausência de Tombo nele já indica um problema (Só Sistema).
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = sisLocalCol ? (item[sisLocalCol] || 'sem local').trim() : 'sem local'; 
@@ -1457,16 +1469,15 @@
                 let hasTombamentoDivergence = false;
 
                 // CRITICAL FIX: Filtra IDs "S/T" ou vazios da verificação de duplicidade de Tombo.
-                const invIdsForCheck = new Set(invData.items
-                    .map(i => normalizeString(i.itemId))
-                    .filter(id => id !== 's t' && id !== ''));
-                const sisIdsForCheck = new Set(sisData.items
-                    .map(i => normalizeString(i.itemId))
-                    .filter(id => id !== 's t' && id !== ''));
+                // Agora, como o invData já foi filtrado na fonte, a lógica aqui é simplificada,
+                // mas mantemos o filtro de "s t" para o Sistema (caso ele tenha).
+                const invIds = new Set(invData.items
+                    .map(i => normalizeString(i.itemId)));
 
+                const sisIds = new Set(sisData.items
+                    .map(i => normalizeString(i.itemId))
+                    .filter(id => id !== 's t' && id !== '')); 
 
-                const invIds = new Set(invData.items.map(i => normalizeString(i.itemId)));
-                const sisIds = new Set(sisData.items.map(i => normalizeString(i.itemId)));
 
                 if (qtdInv > 0 || qtdSis > 0) {
                     let invOnly = [...invIds].some(id => !sisIds.has(id));
@@ -2062,20 +2073,28 @@
                 
                 const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
                 const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
+                const invIdCol = findColumn(invHeader, COLUMNS.INV.ID); // Novo: Captura a coluna Tombo do Inventário
                 const sisUnitCol = findColumn(sisHeader, COLUMNS.SIS.UNIT);
                 const sisLocalCol = findColumn(sisHeader, COLUMNS.SIS.LOCAL);
 
                 // Validação
                 if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' (Inventário) não encontrada.");
                 if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' (Sistema) não encontrada.");
+                // Adicionando validação do Tombo, embora já exista na análise principal
+                if (globalInventarioData.length > 0 && !invIdCol) throw new Error("Coluna 'Tombo' (Inventário) não encontrada.");
+
 
                 globalInventarioData.forEach(item => {
-                    const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
-                    const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
-                    // CRIA A CHAVE NORMALIZADA
-                    const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
-                    if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
-                        allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
+                    const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
+                    // FILTRO APLICADO AQUI: Ignora itens do Inventário sem Tombo válido
+                    if (tombo.length > 0 && normalizeString(tombo) !== 's t') { 
+                        const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
+                        const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                        // CRIA A CHAVE NORMALIZADA
+                        const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                        if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
+                            allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
+                        }
                     }
                 });
                 globalSistemaData.forEach(item => {
