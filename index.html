@@ -780,7 +780,7 @@
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
                 <div class="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
                     <!-- REQ 1: Contador de Locais -->
-                    <h3 class="text-xl font-bold text-inventario mb-3 flex items-center justify-between">
+                    <h3 id="inv-local-title" class="text-xl font-bold text-inventario mb-3 flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <span class="text-2xl">📋</span>
                             <span>Inventário (Origem)</span>
@@ -794,7 +794,7 @@
                 
                 <div class="bg-orange-50 rounded-xl p-5 border-2 border-orange-200">
                     <!-- REQ 1: Contador de Locais -->
-                    <h3 class="text-xl font-bold text-sistema mb-3 flex items-center justify-between">
+                    <h3 id="sis-local-title" class="text-xl font-bold text-sistema mb-3 flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <span class="text-2xl">⚙️</span>
                             <span>Sistema (Destino)</span>
@@ -1583,7 +1583,7 @@
                 
                 // Se a lista de instâncias para este Tombo ficar vazia, remove a chave
                 if (availableSysTombos.get(invTombo).length === 0) {
-                    availableSysTombos.delete(invTombo);
+                    availableSysTombos.delete(tomboKey);
                 }
 
                 // O Tombo Aplicado deve ser o Tombo ORIGINAL do Sistema, não o normalizado
@@ -2261,16 +2261,23 @@
             const availableSysTomboPool = new Map();
 
             // Pools de itens restantes para processamento
-            const remainingInv = rawInvItems.filter(item => !linkedInvIds.has(item.instanceId));
+            // Filtro adicionado: Apenas itens do Inventário com Tombo VÁLIDO (numérico)
+            const remainingInv = rawInvItems
+                                .filter(item => isValidTombo(item.itemId))
+                                .filter(item => !linkedInvIds.has(item.instanceId));
+                                
             const remainingSys = rawSisItems.filter(item => !linkedSysIds.has(item.instanceId));
 
             // Popula o pool de Tombos do Sistema DISPONÍVEL (apenas os restantes)
             remainingSys.forEach(item => {
                 const normalizedTombo = normalizeString(item.itemId);
-                if (!availableSysTomboPool.has(normalizedTombo)) {
-                    availableSysTomboPool.set(normalizedTombo, []);
+                // IMPORTANTE: Só adiciona ao pool de match Tombos VÁLIDOS do Sistema
+                if (isValidTombo(item.itemId)) {
+                    if (!availableSysTomboPool.has(normalizedTombo)) {
+                        availableSysTomboPool.set(normalizedTombo, []);
+                    }
+                    availableSysTomboPool.get(normalizedTombo).push(item.instanceId);
                 }
-                availableSysTomboPool.get(normalizedTombo).push(item.instanceId);
             });
 
 
@@ -2305,29 +2312,37 @@
             
             const filteredSysItems = remainingSys.filter(item => filteredSysInstancesToKeep.has(item.instanceId));
 
+            // Filtro de busca na tela
+            const finalInvItems = filteredInvItems.filter(item => 
+                !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm))
+            );
+            const finalSysItems = filteredSysItems.filter(item => 
+                !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm))
+            );
+
 
             // Passo 3: Renderização (agora com as listas filtradas)
 
             // Lógica para detectar duplicidade de Tombo nos itens RESTANTES (para o badge)
             const countTomboInv = new Map();
-            filteredInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
+            finalInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
             const countTomboSis = new Map();
-            filteredSysItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
+            finalSysItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
 
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
-                <span>Inventário (${filteredInvItems.length} item(s) restante(s) p/ vincular)</span>
+                <span>Inventário (${finalInvItems.length} item(s) restante(s) p/ vincular)</span>
             `;
             document.getElementById('modal-sis-title').innerHTML = `
                 <span class="text-2xl">⚙️</span>
-                <span>Sistema (${filteredSysItems.length} item(s) restante(s) p/ vincular)</span>
+                <span>Sistema (${finalSysItems.length} item(s) restante(s) p/ vincular)</span>
             `;
 
             invList.innerHTML = '';
-            if (filteredInvItems.length === 0) {
+            if (finalInvItems.length === 0) {
                 invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum Tombo do Inventário para vincular.</li>';
             } else {
-                filteredInvItems.forEach((itemData, index) => {
+                finalInvItems.forEach((itemData, index) => {
                     const { instanceId, itemId, description, state } = itemData;
                     
                     const li = document.createElement('li');
@@ -2341,7 +2356,8 @@
                     
                     let badgeText;
                     if (!isTombo) {
-                        badgeText = `⚠️ SEM TOMBO VÁLIDO (ID: ${itemId})`;
+                        // Este código nunca deve ser atingido no Inv, mas fica como segurança
+                        badgeText = `⚠️ SEM TOMBO VÁLIDO (ID: ${itemId})`; 
                     } else if (tomboCount > 1) {
                         badgeText = `⚠️ DUPLICIDADE DE TOMBO (${itemId}) - ${tomboCount} Instâncias`;
                     } else {
@@ -2363,10 +2379,10 @@
             }
 
             sisList.innerHTML = '';
-            if (filteredSysItems.length === 0) {
+            if (finalSysItems.length === 0) {
                 sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum Tombo do Sistema para vincular.</li>';
             } else {
-                filteredSysItems.forEach((itemData, index) => {
+                finalSysItems.forEach((itemData, index) => {
                     const { instanceId, itemId, description, state } = itemData;
                     
                     const li = document.createElement('li');
