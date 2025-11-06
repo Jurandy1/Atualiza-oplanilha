@@ -491,7 +491,7 @@
                     <span>Relatório Final por Unidade</span>
                 </button>
                 <button 
-                    onclick="exportCSV()" 
+                    onclick="exportFinalReport()" 
                     class="px-6 py-3 bg-gradient-to-r from-export to-fuchsia-600 text-white font-bold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex items-center gap-2"
                 >
                     <span class="text-xl">📥</span>
@@ -723,8 +723,8 @@
         <div class="modal-content bg-white w-full max-w-6xl rounded-2xl shadow-2xl transform scale-95" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center border-b-2 border-purple-200 p-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-2xl">
                 <div>
-                    <h2 class="text-3xl font-bold">📋 Relatório Final por Unidade</h2>
-                    <p class="text-purple-100 mt-1">Itens faltantes após aplicar todas as vinculações</p>
+                    <h2 class="text-3xl font-bold">📋 Relatório Final de Auditoria</h2>
+                    <p class="text-purple-100 mt-1">Exportação baseada no Inventário, com o cabeçalho padrão do Sistema e Tombo atualizado.</p>
                 </div>
                 <button onclick="closeFinalReport()" class="text-white hover:text-gray-200 text-4xl transition-colors">
                     &times;
@@ -737,6 +737,7 @@
                 </button>
                 <div id="final-report-content" class="overflow-y-auto custom-scrollbar" style="max-height: calc(90vh - 250px);">
                     <!-- Conteúdo será preenchido dinamicamente -->
+                    <p class="text-center p-8 text-gray-500">Clique em "Relatório Final por Unidade" para gerar a prévia.</p>
                 </div>
             </div>
             <div class="border-t-2 border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
@@ -872,8 +873,9 @@
         let allUniqueLocations = { inv: new Map(), sis: new Map() }; // Mapa global de todos os locais únicos para o modal
         let autoMapSuggestions = new Map(); // Cache para sugestões de auto-map
 
-        // Cabeçalhos de exportação final (definidos pelo usuário)
-        const FINAL_HEADERS = ['Tipo', 'Tombamento', 'Descrição', 'Unidade', 'Quantidade', 'Localização', 'Estado', 'Origem da Doação', 'Observação', 'Fornecedor'];
+        // Cabeçalhos de exportação final (definidos pelo usuário, padrão Sistema)
+        // Usado como TEMPLATE para a exportação final (RESUMO)
+        const FINAL_HEADERS_TEMPLATE = ['Tipo', 'Tombamento', 'Descrição', 'Unidade', 'Quantidade', 'Localização', 'Estado', 'Origem da Doação', 'Observação', 'Fornecedor'];
 
         // Colunas chave para busca nos dados
         const COLUMNS = {
@@ -882,12 +884,12 @@
                 LOCAL: 'local',
                 ITEM: 'item',
                 ID: 'tombo',
-                STATE: 'estado de conservação' // CORRIGIDO: Mapeia para a chave exata
+                STATE: 'estado de conservação' 
             },
             SIS: {
                 UNIT: 'unidade',
-                LOCAL: 'localização', // CORRIGIDO: Mapeia para a chave exata
-                ITEM: 'descrição',    // CORRIGIDO: Mapeia para a chave exata
+                LOCAL: 'localização', 
+                ITEM: 'descrição',    
                 ID: 'tombamento',
                 STATE: 'estado'
             }
@@ -943,7 +945,7 @@
             document.getElementById('modal-link-count').textContent = total;
         }
 
-        // === FUNÇÕES BÁSICAS GLOBAIS (CORRIGIDO ERRO DE REFERÊNCIA) ===
+        // === FUNÇÕES BÁSICAS GLOBAIS ===
         
         function showCustomConfirm(message, onConfirm) {
             // Implementação da função showCustomConfirm
@@ -1108,7 +1110,7 @@
             const sistemaTextarea = document.getElementById('list-sistema');
             
             const invLines = invTextarea.value.trim().split('\n').filter(Boolean).length;
-            const sisLines = sisTextarea.value.trim().split('\n').filter(Boolean).length;
+            const sisLines = sistemaTextarea.value.trim().split('\n').filter(Boolean).length;
             
             const invCount = Math.max(0, invLines - 1);
             const sisCount = Math.max(0, sisLines - 1);
@@ -1128,8 +1130,6 @@
                 timeout = setTimeout(later, wait);
             };
         }
-
-        // Função antiga groupItems removida/não mais necessária para renderModalLists
 
         // === FUNÇÕES DO GERENCIADOR DE LINKS (CORREÇÃO DE BUGS DE LIMPEZA/DELETAR/EXPORTAR/IMPORTAR) ===
 
@@ -1243,6 +1243,23 @@
             showCustomAlert('🗑️ Vínculo removido com sucesso! Execute a Análise para atualizar o relatório.');
         }
 
+        // NOVO: Função para validar se o ID é um Tombo (apenas números, com tolerância a separadores)
+        function isValidTombo(id) {
+            if (typeof id !== 'string' || id.trim() === '') return false;
+            const trimmedId = id.trim();
+            const normalized = normalizeString(trimmedId);
+
+            // 1. Regras de exclusão estritas (palavras ou códigos óbvios)
+            // Se o usuário colou Permuta, S/T, s/t, etc., ignora.
+            if (normalized === 's t' || normalized === 'st' || normalized === 'permuta' || normalized.includes('nao tem') || normalized === 's' || normalized === 't') {
+                return false;
+            }
+
+            // 2. Regra de inclusão: Deve conter pelo menos um dígito e ser composto majoritariamente por caracteres numéricos ou delimitadores de número (., -).
+            // A regra do usuário é "Tombos são só NUMEROS." - Aceita apenas números, e separa/pontuações que acompanham números.
+            return /^[0-9\.\-]*[0-9]+[0-9\.\-]*$/.test(trimmedId);
+        }
+
         // === ANÁLISE PRINCIPAL ===
         
         async function runMasterCount() {
@@ -1345,11 +1362,11 @@
             // 2. Pré-coleta de Locais Únicos (para o Modal de Local Linking)
             allUniqueLocations = { inv: new Map(), sis: new Map() };
             
-            // ATUALIZAÇÃO PRINCIPAL: Ignora itens do Inventário sem Tombo válido na coleta de Locais Únicos
+            // ATUALIZAÇÃO PRINCIPAL: Usa isValidTombo na coleta de Locais Únicos
             globalInventarioData.forEach(item => {
                 const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
-                // Condição de filtro: Só considera se o Tombo não for vazio e nem "S/T" (case insensitive)
-                if (tombo.length > 0 && normalizeString(tombo) !== 's t') { 
+                // Condição de filtro: SÓ CONSIDERA para a contagem/local se tiver Tombo válido (número)
+                if (isValidTombo(tombo)) { 
                     const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                     const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
                     // CRIA A CHAVE NORMALIZADA (UNIFICANDO AS DUPLICAÇÕES)
@@ -1371,11 +1388,16 @@
 
 
             // 3. Processamento e Aplicação de Vínculos de Local
+            let invItemCount = 0;
             globalInventarioData.forEach(item => {
                 const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
-                // FILTRO DE ATIVO AQUI TAMBÉM: Ignora itens do Inventário sem Tombo válido
-                if (tombo.length === 0 || normalizeString(tombo) === 's t') {
-                    return; // Ignora itens do Inventário sem Tombo/S/T
+                
+                // NOVO FILTRO APLICADO AQUI: SÓ PROCESSA ITENS COM TOMBO VÁLIDO PARA AUDITORIA
+                if (!isValidTombo(tombo)) {
+                    // Adiciona um __instanceId para o item SEM Tombo, para fins de exportação final
+                    item.__instanceId = `inv-${Date.now()}-${invItemCount}-${Math.floor(Math.random() * 10000)}`;
+                    invItemCount++;
+                    return; // Ignora itens do Inventário sem Tombo válido
                 }
                 
                 const unidade = invUnitCol ? normalizeString(item[invUnitCol] || 'sem unidade') : 'sem unidade';
@@ -1388,7 +1410,7 @@
                 const compositeKey = mappedSisCompositeKey || invCompositeKey;
                 
                 const localOriginal = local; 
-                const itemId = tombo || `Item sem Tombo Inv-${Math.random()}`;
+                const itemId = tombo;
                 
                 allCompositeKeys.add(compositeKey);
                 
@@ -1403,10 +1425,13 @@
                 }
                 const data = inventarioMap.get(compositeKey);
                 data.count++;
+                invItemCount++;
                 
                 // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
+                const instanceId = `inv-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`;
+                item.__instanceId = instanceId; // Armazena no objeto original para rastreamento
                 data.items.push({ 
-                    instanceId: `inv-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`, // Novo ID de instância
+                    instanceId: instanceId, 
                     itemId: itemId, 
                     data: item, 
                     description: invItemCol ? (item[invItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
@@ -1415,6 +1440,7 @@
             });
             
             // O Sistema não tem filtro de "S/T", pois a ausência de Tombo nele já indica um problema (Só Sistema).
+            let sisItemCount = 0;
             globalSistemaData.forEach(item => {
                 const unidade = sisUnitCol ? normalizeString(item[sisUnitCol] || 'sem unidade') : 'sem unidade';
                 const local = sisLocalCol ? (item[sisLocalCol] || 'sem local').trim() : 'sem local'; 
@@ -1437,10 +1463,13 @@
                 const data = sistemaMap.get(compositeKey);
                 
                 data.count++;
-                
+                sisItemCount++;
+
                 // BUG FIX 2: Adiciona um ID de instância único para permitir vinculação granular
+                const instanceId = `sis-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`;
+                item.__instanceId = instanceId; // Armazena no objeto original para rastreamento
                 data.items.push({ 
-                    instanceId: `sis-${Date.now()}-${data.count}-${Math.floor(Math.random() * 10000)}`, // Novo ID de instância
+                    instanceId: instanceId, 
                     itemId: itemId, 
                     data: item,
                     description: sisItemCol ? (item[sisItemCol] || `Item sem Descrição - ${itemId}`).trim() : `Item sem Descrição - ${itemId}`,
@@ -1458,25 +1487,22 @@
                 const invData = inventarioMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualInvKey: '' };
                 const sisData = sistemaMap.get(compositeKey) || { count: 0, items: [], originalUnit: '', originalLocal: '', actualSisKey: '' };
                 
-                if (invData.count === 0 && sisData.count === 0) continue;
-
-
-                const qtdInv = invData.count;
-                const qtdSis = sisData.count;
+                // NOVO: A contagem agora reflete apenas itens com Tombo válido no Inventário
+                const qtdInv = invData.count; 
+                const qtdSis = sisData.count; 
                 const diff = qtdInv - qtdSis;
 
                 let hasQuantityDivergence = diff !== 0;
                 let hasTombamentoDivergence = false;
 
                 // CRITICAL FIX: Filtra IDs "S/T" ou vazios da verificação de duplicidade de Tombo.
-                // Agora, como o invData já foi filtrado na fonte, a lógica aqui é simplificada,
-                // mas mantemos o filtro de "s t" para o Sistema (caso ele tenha).
                 const invIds = new Set(invData.items
+                    .filter(i => isValidTombo(i.itemId)) // Filtro redundante, mas garante
                     .map(i => normalizeString(i.itemId)));
 
                 const sisIds = new Set(sisData.items
-                    .map(i => normalizeString(i.itemId))
-                    .filter(id => id !== 's t' && id !== '')); 
+                    .filter(i => isValidTombo(i.itemId)) // Apenas Tombos Válidos no Sistema
+                    .map(i => normalizeString(i.itemId)));
 
 
                 if (qtdInv > 0 || qtdSis > 0) {
@@ -1522,20 +1548,378 @@
             }
         }
 
-        // REQ 3: Popula filtro com APENAS unidades que contêm divergência
+        // NOVO: Função para obter status final de um item do inventário
+        // Recebe o mapa de Tombos disponíveis do Sistema (para match implícito)
+        function getFinalStatus(invItemInstance, compositeKey, availableSysTombos) {
+            const invTombo = normalizeString(invItemInstance.itemId);
+            
+            // 1. Checa se o item foi explicitamente vinculado (via itemLinks)
+            const locationLinksMap = itemLinks.get(compositeKey) || new Map();
+            const linkedSisId = locationLinksMap.get(invItemInstance.instanceId);
+            
+            if (linkedSisId) {
+                // Remove o item vinculado do mapa de sistema para que ele não seja contado como disponível/sobra
+                // O linkedSisId é um instanceId. Procuramos o Tombo ID correspondente no mapa de availableSysTombos.
+                let matchedSysTombo = 'N/A';
+                
+                for(const [tomboKey, instanceIds] of availableSysTombos.entries()) {
+                    const index = instanceIds.indexOf(linkedSisId);
+                    if (index > -1) {
+                        matchedSysTombo = tomboKey; // Encontrou o Tombo normalizado
+                        instanceIds.splice(index, 1); // Remove o instanceId do array de disponíveis
+                        if (instanceIds.length === 0) {
+                            availableSysTombos.delete(tomboKey);
+                        }
+                        break;
+                    }
+                }
+                
+                // O Tombo Aplicado deve ser o Tombo ORIGINAL do Sistema, não o normalizado
+                const linkedSysItem = globalSistemaData.find(item => item.__instanceId === linkedSisId);
+                const sisIdCol = globalSistemaData.length > 0 ? findColumn(Object.keys(globalSistemaData[0]), COLUMNS.SIS.ID) : null;
+                const newTombo = linkedSysItem && sisIdCol ? (linkedSysItem[sisIdCol] || 'N/A') : 'N/A';
+
+                // Encontrado e Vinculado
+                return { 
+                    status: 'Vinculado', 
+                    newTombo: newTombo,
+                    sisKey: linkedSisId
+                };
+            }
+            
+            // 2. Checa se o Tombo faz um match direto (implícito) e está disponível
+            if (availableSysTombos.has(invTombo) && availableSysTombos.get(invTombo).length > 0) {
+                // Pega a primeira instância disponível para este Tombo
+                const sisInstanceId = availableSysTombos.get(invTombo).shift(); 
+                
+                // Se a lista de instâncias para este Tombo ficar vazia, remove a chave
+                if (availableSysTombos.get(invTombo).length === 0) {
+                    availableSysTombos.delete(invTombo);
+                }
+
+                // O Tombo Aplicado deve ser o Tombo ORIGINAL do Sistema, não o normalizado
+                const matchedSysItem = globalSistemaData.find(item => item.__instanceId === sisInstanceId);
+                const sisIdCol = globalSistemaData.length > 0 ? findColumn(Object.keys(globalSistemaData[0]), COLUMNS.SIS.ID) : null;
+                const newTombo = matchedSysItem && sisIdCol ? (matchedSysItem[sisIdCol] || 'N/A') : 'N/A';
+                
+                // Encontrado por Tombo (Match)
+                return { 
+                    status: 'Encontrado', 
+                    newTombo: newTombo,
+                    sisKey: sisInstanceId
+                };
+            }
+            
+            // 3. Faltante
+            return { 
+                status: 'Faltante', 
+                newTombo: invItemInstance.itemId,
+                sisKey: 'N/A' 
+            };
+        }
+
+        // NOVO: Função que gera o relatório final (dados processados)
+        async function generateFinalReport() {
+            showLoading(true);
+            await new Promise(resolve => setTimeout(resolve, 100)); // Delay para mostrar loading
+            
+            try {
+                // Re-executa a auditoria para garantir que os dados e vínculos mais recentes sejam usados
+                await processAuditData(); 
+                
+                const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
+                
+                // Mapeamento das colunas do Inventário (para extrair os dados)
+                const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
+                const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
+                const invItemCol = findColumn(invHeader, COLUMNS.INV.ITEM);
+                const invIdCol = findColumn(invHeader, COLUMNS.INV.ID);     
+                const invStateCol = findColumn(invHeader, COLUMNS.INV.STATE); 
+                
+                // Mapeamento de colunas "extras" que podem existir no Inventário
+                // Tenta encontrar um match aproximado dos campos do template final no Inventário
+                const invTipoCol = findColumn(invHeader, 'tipo');
+                const invQtdCol = findColumn(invHeader, 'quantidade');
+                const invOrigemCol = findColumn(invHeader, 'origem da doação');
+                const invObsCol = findColumn(invHeader, 'observação');
+                const invFornCol = findColumn(invHeader, 'fornecedor');
+
+                const sisIdCol = globalSistemaData.length > 0 ? findColumn(Object.keys(globalSistemaData[0]), COLUMNS.SIS.ID) : null;     
+                
+                // 1. Criar um mapa de Tombos disponíveis no Sistema (Tombo normalizado -> Lista de instanceIds)
+                const availableSysTombos = new Map(); // Map<normalizedTombo, List<instanceId>>
+                
+                globalSistemaData.forEach(item => {
+                    // ATENÇÃO: Se o item do Sistema não tem Tombo, ele não entra no pool de match Tombo-a-Tombo
+                    const id = sisIdCol ? (item[sisIdCol] || '').trim() : '';
+                    if (isValidTombo(id)) { // Só considera Tombos válidos (numericos) do Sistema
+                        const normalizedId = normalizeString(id);
+                        if (!availableSysTombos.has(normalizedId)) {
+                            availableSysTombos.set(normalizedId, []);
+                        }
+                        // O __instanceId foi preenchido por processAuditData
+                        const instanceId = item.__instanceId; 
+                        availableSysTombos.get(normalizedId).push(instanceId);
+                    }
+                });
+
+                // 2. Processar TODOS os itens do Inventário (base do relatório final)
+                const finalReportData = [];
+                
+                globalInventarioData.forEach(item => {
+                    const instanceId = item.__instanceId; // Deve estar preenchido por processAuditData
+                    const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
+                    const isTomboValid = isValidTombo(tombo);
+                    
+                    const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
+                    const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
+                    
+                    // Lógica para determinar a chave composta de comparação (aplica link de local)
+                    const invCompositeKey = `${normalizeString(unidade)}|${normalizeString(local)}`;
+                    const mappedSisCompositeKey = locationLinks.get(invCompositeKey);
+                    const finalCompositeKey = mappedSisCompositeKey || invCompositeKey;
+                    
+                    const invItemInstance = {
+                        instanceId: instanceId,
+                        itemId: tombo, 
+                        data: item,
+                        isTomboValid: isTomboValid,
+                        compositeKey: finalCompositeKey,
+                        originalLocal: local
+                    };
+                    
+                    let statusResult = { 
+                        status: 'Sem Tombo Válido', 
+                        newTombo: tombo 
+                    };
+
+                    if (isTomboValid) {
+                        // Item com Tombo Válido: Checar status
+                        statusResult = getFinalStatus(invItemInstance, finalCompositeKey, availableSysTombos);
+                    }
+                    
+                    // --- Mapeamento para o Cabeçalho Padrão do Sistema (FINAL_HEADERS_TEMPLATE) ---
+                    const finalItem = {
+                        // 1. Campos principais mapeados do Inventário para o padrão do Sistema
+                        'Tipo': invTipoCol ? item[invTipoCol] : '',
+                        'Tombamento': statusResult.newTombo, // O NOVO TOMBO APLICADO (o grande update)
+                        'Descrição': invItemCol ? item[invItemCol] : '',
+                        'Unidade': unidade,
+                        // Assume 1 se a coluna QTD não for encontrada ou estiver vazia
+                        'Quantidade': invQtdCol && item[invQtdCol] ? item[invQtdCol] : '1', 
+                        'Localização': local,
+                        'Estado': invStateCol ? item[invStateCol] : '',
+                        // 2. Campos extras
+                        'Origem da Doação': invOrigemCol ? item[invOrigemCol] : '',
+                        'Observação': invObsCol ? item[invObsCol] : '',
+                        'Fornecedor': invFornCol ? item[invFornCol] : '',
+                        // 3. Colunas de Status de Auditoria
+                        'TOMBO_ORIGINAL': tombo,
+                        'STATUS_FINAL': statusResult.status,
+                        'ORIGEM_LOCAL_VINCULADA': invItemInstance.originalLocal,
+                    };
+                    
+                    finalReportData.push(finalItem);
+                });
+
+                // 3. Montar a Tabela HTML para o modal (Opção 1)
+                const exportHeaders = [...FINAL_HEADERS_TEMPLATE, 'TOMBO_ORIGINAL', 'STATUS_FINAL', 'ORIGEM_LOCAL_VINCULADA'];
+                renderFinalReportTable(finalReportData, exportHeaders);
+                
+                // 4. Exibir o modal
+                openFinalReport();
+
+            } catch (error) {
+                console.error('Erro ao gerar relatório final:', error);
+                showCustomAlert(`❌ Erro ao gerar relatório final: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // NOVO: Renderiza a tabela do relatório final no modal
+        function renderFinalReportTable(data, headers) {
+            const container = document.getElementById('final-report-content');
+            container.innerHTML = '';
+
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-center p-8 text-gray-500">Nenhum dado do Inventário para gerar o relatório.</p>';
+                return;
+            }
+
+            // Define os cabeçalhos de exibição (passados por generateFinalReport)
+            const exportHeaders = headers; 
+            
+            let html = '<div class="overflow-x-auto custom-scrollbar" style="max-height: calc(90vh - 250px);">';
+            html += '<table class="report-table">';
+            
+            // Cabeçalho da tabela
+            html += '<thead><tr>';
+            exportHeaders.forEach(h => {
+                // Destaca as colunas de status no cabeçalho
+                const isStatusColumn = h.includes('TOMBO_ORIGINAL') || h.includes('STATUS_FINAL') || h.includes('ORIGEM_LOCAL_VINCULADA');
+                // Destaca o Tombamento e Localização como chave do sistema
+                const isSystemKey = h === 'Tombamento' || h === 'Localização' || h === 'Descrição' || h === 'Unidade' || h === 'Estado';
+                
+                let colorClass = 'bg-gray-200 text-gray-700';
+                if (isStatusColumn) {
+                    colorClass = 'bg-purple-600 text-white';
+                } else if (isSystemKey) {
+                    colorClass = 'bg-gray-300 text-gray-800'; // Cor mais escura para o padrão do Sistema
+                }
+
+                html += `<th class="${colorClass} sticky top-0">${h.toUpperCase()}</th>`;
+            });
+            html += '</tr></thead>';
+
+            // Corpo da tabela
+            html += '<tbody>';
+            data.forEach(item => {
+                let rowClass = 'hover:bg-gray-100';
+                // Mantém o destaque visual para o status
+                if (item['STATUS_FINAL'] === 'Faltante') {
+                    rowClass = 'bg-red-50 hover:bg-red-100 text-red-700 font-semibold';
+                } else if (item['STATUS_FINAL'] === 'Vinculado') {
+                    rowClass = 'bg-purple-50 hover:bg-purple-100 text-purple-700';
+                } else if (item['STATUS_FINAL'] === 'Encontrado') {
+                     rowClass = 'bg-green-50 hover:bg-green-100 text-green-700';
+                } else if (item['STATUS_FINAL'] === 'Sem Tombo Válido') {
+                     rowClass = 'bg-gray-100 hover:bg-gray-200 text-gray-500 italic';
+                }
+                
+                html += `<tr class="${rowClass}">`;
+                exportHeaders.forEach(h => {
+                    let cellValue = item[h] !== undefined ? item[h] : '';
+                    
+                    if (h === 'STATUS_FINAL') {
+                         cellValue = `<span class="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap" style="background-color: ${
+                            item[h] === 'Faltante' ? '#fecaca' : 
+                            item[h] === 'Vinculado' ? '#e9d5ff' : 
+                            item[h] === 'Encontrado' ? '#dcfce7' : '#f3f4f6'
+                         }; color: ${
+                            item[h] === 'Faltante' ? '#dc2626' : 
+                            item[h] === 'Vinculado' ? '#9333ea' : 
+                            item[h] === 'Encontrado' ? '#16a34a' : '#4b5563'
+                         };">${item[h].toUpperCase()}</span>`;
+                    }
+                    
+                    html += `<td class="whitespace-nowrap">${cellValue}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            
+            container.innerHTML = html;
+        }
+
+        // NOVO: Abre o modal do relatório final
+        function openFinalReport() {
+            const modal = document.getElementById('final-report-modal');
+            const modalContent = modal.querySelector('.modal-content');
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        // NOVO: Fecha o modal do relatório final
+        function closeFinalReport() {
+            const modal = document.getElementById('final-report-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // NOVO: Exporta o relatório final (CSV)
+        async function exportFinalReport() {
+             showLoading(true);
+             // Re-executa o processamento para garantir que a lista `finalReportData` seja populada
+             // Isso pode ser demorado, por isso está no início
+             await generateFinalReport(); 
+             
+             try {
+                const container = document.getElementById('final-report-content');
+                const table = container.querySelector('.report-table');
+                
+                if (!table) {
+                    showCustomAlert("⚠️ Nenhum dado de relatório para exportar. Gere o relatório primeiro.");
+                    return;
+                }
+
+                let csv = [];
+                const rows = table.querySelectorAll('tr');
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = row.querySelectorAll('th, td');
+                    const rowData = [];
+                    cells.forEach(cell => {
+                        let text;
+                        if (rowIndex === 0) { // Cabeçalho
+                            text = cell.textContent.trim();
+                        } else { // Dados
+                            const span = cell.querySelector('span');
+                            // Se for um status badge, pega o texto do span, senão pega o texto da célula
+                            text = span ? span.textContent.trim() : cell.textContent.trim(); 
+                        }
+                        
+                        // Remove quebras de linha e trata a formatação CSV
+                        text = text.replace(/"/g, '""'); // Escape double quotes
+                        if (text.includes(';') || text.includes('\n') || text.includes('"')) {
+                            text = `"${text}"`; // Enclose in quotes if necessary
+                        }
+                        rowData.push(text);
+                    });
+                    csv.push(rowData.join(';')); // Usa ponto e vírgula como separador
+                });
+
+                const csvString = csv.join('\n');
+                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' }); // Adiciona BOM para caracteres especiais
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'relatorio_final_auditoria.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showCustomAlert('📥 Relatório Final exportado com sucesso como CSV.');
+             } catch (error) {
+                 console.error('Erro ao exportar relatório:', error);
+                 showCustomAlert(`❌ Erro ao exportar relatório: ${error.message}`);
+             } finally {
+                 showLoading(false);
+             }
+        }
+        
+        // NOVO: Função para reanalisar e fechar o modal (usada no modal de vinculação de local e item)
+        async function reanalyzeWithLinks() {
+            closeLocalLinkingModal();
+            closeModal();
+            await runMasterCount();
+            showCustomAlert('🔄 Reanálise completa! Verifique o relatório atualizado.');
+        }
+
+        // Funções do arquivo original (mantidas)
+
         function populateUnitFilter() {
-            // BUG FIX 1: Usa chave normalizada para garantir unicidade
             const uniqueNormalizedUnits = new Map(); // Map<normalizedKey, originalName>
             const filterSelect = document.getElementById('unit-filter');
             
             discrepancyDetails.forEach(details => {
                 const normalizedKey = details.normalizedUnitKey;
-                // Usa o nome original (não normalizado) para a exibição no dropdown
                 if (!uniqueNormalizedUnits.has(normalizedKey)) {
                      uniqueNormalizedUnits.set(normalizedKey, details.unidade);
-                } else {
-                     // Caso haja nomes originais diferentes para a mesma chave normalizada, 
-                     // mantemos o primeiro encontrado (o mais representativo).
                 }
             });
 
@@ -1549,7 +1933,6 @@
             allOption.textContent = "🌐 Todas as Unidades Divergentes";
             filterSelect.appendChild(allOption);
             
-            // Filtra pelo nome normalizado, mas exibe o nome original
             const sortedKeys = [...uniqueNormalizedUnits.keys()].sort();
             sortedKeys.forEach(normKey => {
                 const originalName = uniqueNormalizedUnits.get(normKey);
@@ -1560,7 +1943,6 @@
             });
         }
 
-        // REQ 4: Só exibe cards para locais com divergência
         function filterResultCards(selectedUnit) {
             const cardsContainer = document.getElementById('discrepancy-cards-container');
             const noDiscrepancyMsg = document.getElementById('no-discrepancy-message');
@@ -1569,7 +1951,6 @@
             let totalInv = 0;
             let totalSis = 0;
 
-            // BUG FIX 1: Filtra pela chave normalizada
             const filteredAuditData = (selectedUnit === 'all_divergent') 
                 ? auditData 
                 : auditData.filter(item => item.normalizedUnitKey === selectedUnit);
@@ -1580,7 +1961,6 @@
             }
             
             const searchFilteredEntries = [...discrepancyDetails.entries()].filter(([key, details]) => {
-                // BUG FIX 1: Filtra pela chave normalizada
                 const matchesUnit = selectedUnit === 'all_divergent' || details.normalizedUnitKey === selectedUnit;
                 
                 const matchesSearch = currentSearchTerm 
@@ -1595,9 +1975,8 @@
             
             const groupedDetails = new Map();
             searchFilteredEntries.forEach(([key, details]) => {
-                // BUG FIX 1: Agrupa pela chave normalizada
                 const unitKey = details.normalizedUnitKey; 
-                const unitName = details.unidade; // Nome original para exibição
+                const unitName = details.unidade; 
                 
                 if (!groupedDetails.has(unitKey)) {
                     groupedDetails.set(unitKey, { name: unitName, items: [] });
@@ -1615,7 +1994,7 @@
                     unitSection.innerHTML = `
                         <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="text-3xl">🏢</span>
-                            <span>${unitGroup.name}</span> <!-- Exibe o nome original -->
+                            <span>${unitGroup.name}</span> 
                             <span class="ml-auto bg-primary text-white px-3 py-1 rounded-full text-sm">${unitGroup.items.length} locais com divergência</span>
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1634,7 +2013,6 @@
 
                 noDiscrepancyMsg.classList.add('hidden');
             } else {
-                 // REQ 2: Exibir mensagem de conclusão destacada
                 cardsContainer.innerHTML = `
                     <div class="p-8 bg-gradient-to-r from-green-50 to-emerald-100 rounded-xl border-4 border-green-400 shadow-xl">
                         <span class="text-6xl mb-4 block text-center">✅</span>
@@ -1642,7 +2020,7 @@
                         <span class="text-gray-600 block text-center">Nenhuma discrepância pendente encontrada após a aplicação de todos os vínculos.</span>
                     </div>
                 `;
-                noDiscrepancyMsg.classList.add('hidden'); // Oculta a mensagem genérica
+                noDiscrepancyMsg.classList.add('hidden'); 
             }
 
             updateSummaryUI(totalInv, totalSis, totalInv - totalSis);
@@ -1655,7 +2033,6 @@
             `;
         }
 
-        // Cria card com aviso de divergência combinada
         function createDiscrepancyCard(details, compositeKey) {
             const item = details;
             
@@ -1666,21 +2043,18 @@
             let divergenceWarning = '';
 
             if (item.hasQuantityDivergence && item.hasTombamentoDivergence) {
-                // Divergência de Quantidade e Tombo
                 cardClass = 'bg-gradient-to-br from-red-100 to-red-200 border-red-400';
                 diffClass = 'text-red-600';
                 borderColor = 'border-red-500';
                 icon = '🔥';
                 divergenceWarning = '<span class="status-badge bg-red-200 text-red-800 pulse-warning">⚠️ Qtd. e Tombo Divergentes</span>';
             } else if (item.hasQuantityDivergence) { 
-                // Divergência de Quantidade
                 cardClass = item.diff > 0 ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-300' : 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-300';
                 diffClass = item.diff > 0 ? 'text-red-600' : 'text-orange-600';
                 borderColor = item.diff > 0 ? 'border-red-400' : 'border-orange-400';
                 icon = item.diff > 0 ? '⬇️' : '⬆️'; 
                 divergenceWarning = '<span class="status-badge bg-red-200 text-red-800 pulse-warning">⚠️ Qtd. Divergente</span>';
             } else if (item.hasTombamentoDivergence) {
-                // Divergência de Tombamento (Qtd OK)
                 cardClass = 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-300';
                 diffClass = 'text-gray-700';
                 borderColor = 'border-yellow-400';
@@ -1760,8 +2134,6 @@
             filterResultCards(selectedUnit);
         }, 300);
 
-        // === SISTEMA DE VINCULAÇÃO DE ITEM/TOMBO ===
-
         function toggleLinkingMode() {
             itemLinkingMode = !itemLinkingMode;
             const btn = document.getElementById('link-mode-btn');
@@ -1804,7 +2176,6 @@
             }
         }
 
-        // Função para selecionar item - AGORA USA O INSTANCE ID ÚNICO
         function selectItemForLinking(event, instanceId, isInventory) {
             if (!itemLinkingMode) return;
             
@@ -1813,7 +2184,6 @@
             const clickedLi = event.target.closest('li');
             if (!clickedLi) return;
 
-            // BUG FIX 2: Usa instanceId para rastreamento
             if (isInventory) {
                 selectedInvItem = instanceId;
                 document.querySelectorAll('#modal-inv-list .item-selected').forEach(el => el.classList.remove('item-selected'));
@@ -1825,49 +2195,41 @@
             }
             
             if (selectedInvItem && selectedSysItem) {
-                // BUG FIX 2: Passa instanceIds para a criação do link
                 createItemLink(selectedInvItem, selectedSysItem);
             }
         }
 
-        // Cria link e melhora efeito de escolha (itens somem)
-        function createItemLink(invInstanceId, sysInstanceId) { // Agora usa Instance IDs
+        function createItemLink(invInstanceId, sysInstanceId) { 
             if (!itemLinks.has(currentCompositeKey)) {
                 itemLinks.set(currentCompositeKey, new Map());
             }
             
-            const locationLinksMap = itemLinks.get(currentCompositeKey); // Renomeada para evitar conflito
-            // BUG FIX 2: Linka os IDs de Instância, não os IDs de Tombo
+            const locationLinksMap = itemLinks.get(currentCompositeKey); 
             locationLinksMap.set(invInstanceId, sysInstanceId);
             
             saveLinksToStorage();
             
-            // Reseta seleção
             selectedInvItem = null;
             selectedSysItem = null;
             document.querySelectorAll('.item-selected').forEach(el => el.classList.remove('item-selected'));
             
             const details = discrepancyDetails.get(currentCompositeKey);
             if (details) {
-                // Obtém o Tombo ID para o alerta (Melhor UX)
                 const invTombo = details.invItems.find(i => i.instanceId === invInstanceId)?.itemId || invInstanceId;
                 const sysTombo = details.sisItems.find(i => i.instanceId === sysInstanceId)?.itemId || sysInstanceId;
                 
-                // Renderiza novamente a lista para remover os itens vinculados
                 renderModalLists(details.invItems, details.sisItems, document.getElementById('modal-search').value);
                 
-                // Checa se a lista ficou vazia após o link
                 const invListCount = document.getElementById('modal-inv-list').querySelectorAll('li').length;
                 const sisListCount = document.getElementById('modal-sis-list').querySelectorAll('li').length;
                 
                 if (invListCount === 0 && sisListCount === 0) {
                     showCustomAlert('✅ Vínculo criado e divergência resolvida! Reanalisando a tabela...');
                     closeModal();
-                    runMasterCount(); // Re-run master count to remove the card from the main screen
+                    runMasterCount(); 
                     return;
                 }
 
-                // Exibe alerta padrão (melhorado para mostrar o Tombo ID e a natureza do link)
                 showCustomAlert(`✅ Vínculo criado!\n📋 Inventário Tombo: ${invTombo}\n⚙️ Sistema Tombamento: ${sysTombo}`);
             }
         }
@@ -1895,20 +2257,15 @@
             }, 10);
         }
 
-        // Renderiza listas exibindo CADA INSTÂNCIA e filtrando itens vinculados
         function renderModalLists(rawInvItems, rawSisItems, searchTerm = '') {
             const invList = document.getElementById('modal-inv-list');
             const sisList = document.getElementById('modal-sis-list');
             
-            // Mapa de links de instância para este local (Map<invInstanceId, sisInstanceId>)
             const locationItemLinks = itemLinks.get(currentCompositeKey) || new Map();
             
-            // Cria um Set de todas as Inv Instance IDs que foram vinculadas (para remover)
             const linkedInvIds = new Set(locationItemLinks.keys());
-            // Cria um Set de todas as Sis Instance IDs que foram vinculadas (para remover)
             const linkedSisIds = new Set(locationItemLinks.values());
 
-            // BUG FIX 2: Filtra itens que JÁ FORAM VINCULADOS (usando instanceId)
             const filteredInvItems = rawInvItems
                 .filter(item => !linkedInvIds.has(item.instanceId)) 
                 .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
@@ -1917,13 +2274,11 @@
                 .filter(item => !linkedSisIds.has(item.instanceId)) 
                 .filter(item => !searchTerm || normalizeString(item.itemId).includes(normalizeString(searchTerm)) || normalizeString(item.description).includes(normalizeString(searchTerm)));
                 
-            // Lógica para detectar duplicidade de Tombo nos itens RESTANTES
             const countTomboInv = new Map();
             filteredInvItems.forEach(item => countTomboInv.set(item.itemId, (countTomboInv.get(item.itemId) || 0) + 1));
             const countTomboSis = new Map();
             filteredSisItems.forEach(item => countTomboSis.set(item.itemId, (countTomboSis.get(item.itemId) || 0) + 1));
 
-            // Títulos
             document.getElementById('modal-inv-title').innerHTML = `
                 <span class="text-2xl">📋</span>
                 <span>Inventário (${filteredInvItems.length} item(s) restante(s))</span>
@@ -1933,7 +2288,6 @@
                 <span>Sistema (${filteredSisItems.length} item(s) restante(s))</span>
             `;
 
-            // Renderiza Inventário - AGORA ITERA SOBRE CADA INSTÂNCIA
             invList.innerHTML = '';
             if (filteredInvItems.length === 0) {
                 invList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
@@ -1947,13 +2301,12 @@
                         li.setAttribute('onclick', `selectItemForLinking(event, '${instanceId.replace(/'/g, "\\'")}', true)`);
                     }
                     
-                    // Lógica de exibição da duplicação (por item ID)
                     const tomboCount = countTomboInv.get(itemId);
-                    const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
+                    const isTombo = isValidTombo(itemId);
                     
                     let badgeText;
-                    if (isST) {
-                        badgeText = `⚠️ SEM ID (Tombo: ${itemId})`;
+                    if (!isTombo) {
+                        badgeText = `⚠️ SEM TOMBO VÁLIDO (ID: ${itemId})`;
                     } else if (tomboCount > 1) {
                         badgeText = `⚠️ DUPLICIDADE DE TOMBO (${itemId}) - ${tomboCount} Instâncias`;
                     } else {
@@ -1967,14 +2320,13 @@
                         </div>
                         <div class="ml-9 flex flex-wrap gap-2 items-center">
                             <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
-                            <span class="divergence-badge bg-blue-200 text-blue-800 border border-blue-400">${badgeText}</span>
+                            <span class="divergence-badge ${!isTombo ? 'bg-red-200 text-red-800 border-red-400' : 'bg-blue-200 text-blue-800 border-blue-400'}">${badgeText}</span>
                         </div>
                     `;
                     invList.appendChild(li);
                 });
             }
 
-            // Renderiza Sistema - AGORA ITERA SOBRE CADA INSTÂNCIA
             sisList.innerHTML = '';
             if (filteredSisItems.length === 0) {
                 sisList.innerHTML = '<li class="text-gray-500 italic p-3 bg-white rounded-lg">Nenhum item restante.</li>';
@@ -1988,13 +2340,12 @@
                          li.setAttribute('onclick', `selectItemForLinking(event, '${instanceId.replace(/'/g, "\\'")}', false)`);
                     }
                     
-                    // Lógica de exibição da duplicação (por item ID)
                     const tomboCount = countTomboSis.get(itemId);
-                    const isST = normalizeString(itemId) === 's t' || normalizeString(itemId) === '';
+                    const isTombo = isValidTombo(itemId);
 
                     let badgeText;
-                    if (isST) {
-                        badgeText = `⚠️ SEM ID (Tombamento: ${itemId})`;
+                    if (!isTombo) {
+                        badgeText = `⚠️ SEM TOMBO VÁLIDO (ID: ${itemId})`;
                     } else if (tomboCount > 1) {
                         badgeText = `⚠️ DUPLICIDADE DE TOMBAMENTO (${itemId}) - ${tomboCount} Instâncias`;
                     } else {
@@ -2008,14 +2359,13 @@
                         </div>
                         <div class="ml-9 flex flex-wrap gap-2 items-center">
                             <span class="text-xs font-semibold text-gray-700">Estado: ${state}</span>
-                            <span class="divergence-badge bg-orange-200 text-orange-800 border border-orange-400">${badgeText}</span>
+                            <span class="divergence-badge ${!isTombo ? 'bg-red-200 text-red-800 border-red-400' : 'bg-orange-200 text-orange-800 border-orange-400'}">${badgeText}</span>
                         </div>
                     `;
                     sisList.appendChild(li);
                 });
             }
 
-            // Atualiza subtítulo do modal (REQ 3, 4)
             const details = discrepancyDetails.get(currentCompositeKey);
             let subtitle = `🏢 ${details.unidade}`;
             let linkingMessage = 'Selecione 1 item do Inventário e 1 do Sistema para vincular';
@@ -2051,11 +2401,7 @@
             }, 300);
         }
 
-        // === VINCULAÇÃO DE LOCAL (REQ 1 - MODO AUDITORIA) ===
-
-        // BUGFIX: Pré-processa os locais antes de abrir o modal
-        async function toggleLocalLinkingMode() {
-            // 1. Carrega os dados das textareas
+        function toggleLocalLinkingMode() {
             globalInventarioData = parseData(document.getElementById('list-inventario').value);
             globalSistemaData = parseData(document.getElementById('list-sistema').value);
 
@@ -2065,7 +2411,6 @@
             }
 
             try {
-                // 2. Re-popula allUniqueLocations (lógica que também existe em processAuditData)
                 allUniqueLocations = { inv: new Map(), sis: new Map() };
                 
                 const invHeader = globalInventarioData.length > 0 ? Object.keys(globalInventarioData[0]) : [];
@@ -2073,24 +2418,20 @@
                 
                 const invUnitCol = findColumn(invHeader, COLUMNS.INV.UNIT);
                 const invLocalCol = findColumn(invHeader, COLUMNS.INV.LOCAL);
-                const invIdCol = findColumn(invHeader, COLUMNS.INV.ID); // Novo: Captura a coluna Tombo do Inventário
+                const invIdCol = findColumn(invHeader, COLUMNS.INV.ID); 
                 const sisUnitCol = findColumn(sisHeader, COLUMNS.SIS.UNIT);
                 const sisLocalCol = findColumn(sisHeader, COLUMNS.SIS.LOCAL);
 
-                // Validação
                 if (globalInventarioData.length > 0 && !invLocalCol) throw new Error("Coluna 'Local' (Inventário) não encontrada.");
                 if (globalSistemaData.length > 0 && !sisLocalCol) throw new Error("Coluna 'Localização' (Sistema) não encontrada.");
-                // Adicionando validação do Tombo, embora já exista na análise principal
                 if (globalInventarioData.length > 0 && !invIdCol) throw new Error("Coluna 'Tombo' (Inventário) não encontrada.");
 
 
                 globalInventarioData.forEach(item => {
                     const tombo = invIdCol ? (item[invIdCol] || '').trim() : '';
-                    // FILTRO APLICADO AQUI: Ignora itens do Inventário sem Tombo válido
-                    if (tombo.length > 0 && normalizeString(tombo) !== 's t') { 
+                    if (isValidTombo(tombo)) { 
                         const unidade = invUnitCol ? (item[invUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                         const local = invLocalCol ? (item[invLocalCol] || 'Sem Local').trim() : 'Sem Local';
-                        // CRIA A CHAVE NORMALIZADA
                         const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                         if (local !== 'Sem Local' && !allUniqueLocations.inv.has(key)) {
                             allUniqueLocations.inv.set(key, { unit: unidade, local: local, key: key });
@@ -2100,7 +2441,6 @@
                 globalSistemaData.forEach(item => {
                     const unidade = sisUnitCol ? (item[sisUnitCol] || 'Sem Unidade').trim() : 'Sem Unidade';
                     const local = sisLocalCol ? (item[sisLocalCol] || 'Sem Local').trim() : 'Sem Local';
-                    // CRIA A CHAVE NORMALIZADA
                     const key = `${normalizeString(unidade)}|${normalizeString(local)}`;
                     if (local !== 'Sem Local' && !allUniqueLocations.sis.has(key)) {
                         allUniqueLocations.sis.set(key, { unit: unidade, local: local, key: key });
@@ -2112,17 +2452,15 @@
                 return;
             }
 
-            // 3. Inicializa e popula o modal
-            setupLocalLinkingModal('none'); // Chama com 'none' para popular o filtro de unidade
+            setupLocalLinkingModal('none'); 
             
             const modal = document.getElementById('local-linking-modal');
             const modalContent = modal.querySelector('.modal-content');
             
-            locationLinkingMode = true; // Ativa modo
+            locationLinkingMode = true; 
             currentAuditedInvKey = null;
-            document.getElementById('local-unit-filter').value = 'none'; // Reseta o filtro
+            document.getElementById('local-unit-filter').value = 'none'; 
 
-            // Popula o filtro de unidades para o modal de Vinculação
             const unitFilter = document.getElementById('local-unit-filter');
             unitFilter.innerHTML = '<option value="none">Selecione a Unidade</option>';
             const unitsMap = new Map();
@@ -2132,10 +2470,9 @@
             [...unitsMap.keys()].sort().forEach(normUnit => {
                 if (normUnit !== 'sem unidade') {
                     const option = document.createElement('option');
-                    // O TEXTO visível será o nome original (melhor guess) e o VALUE será o nome normalizado (chave de busca)
                     const originalUnitName = unitsMap.get(normUnit);
                     
-                    option.value = normUnit; // O VALOR é a chave normalizada
+                    option.value = normUnit; 
                     option.textContent = `🏢 ${originalUnitName}`;
                     unitFilter.appendChild(option);
                 }
@@ -2150,7 +2487,6 @@
             }, 10);
         }
 
-        // REQ 1: Popula o modal de auditoria de local
         function setupLocalLinkingModal(selectedUnit) {
             const invList = document.getElementById('local-inv-list');
             const sisList = document.getElementById('local-sis-list');
@@ -2175,8 +2511,6 @@
             document.getElementById('btn-remove-local').disabled = true;
 
 
-            // 2. Filtra locais pela unidade selecionada
-            // selectedUnit é a chave normalizada (ex: "unidade x")
             const normalizedUnit = selectedUnit; 
             
             const filteredInv = [...allUniqueLocations.inv.values()]
@@ -2187,17 +2521,13 @@
                 .filter(loc => loc.key.startsWith(normalizedUnit + '|'))
                 .sort((a, b) => a.local.localeCompare(b.local));
             
-            // 3. Auto-mapeamento (sugestão)
             autoMapSuggestions = autoMapLocations(filteredInv, filteredSis);
 
-            // 4. Renderiza lista de Inventário (Origem)
-            const remainingInv = filteredInv.filter(loc => !locationLinks.has(loc.key)); // Filtra locais já mapeados (Origem)
+            const remainingInv = filteredInv.filter(loc => !locationLinks.has(loc.key)); 
 
-            // NOVO: 5. Filtra locais de Sistema (Destino) que JÁ foram vinculados
             const linkedSisKeys = new Set([...locationLinks.values()]);
-            const remainingSis = filteredSis.filter(loc => !linkedSisKeys.has(loc.key)); // Filtra locais já mapeados (Destino)
+            const remainingSis = filteredSis.filter(loc => !linkedSisKeys.has(loc.key)); 
 
-            // REQ 1: Atualiza contadores para exibir os "restantes"
             invCountSpan.textContent = `${remainingInv.length} Locais restantes`;
             sisCountSpan.textContent = `${remainingSis.length} Locais restantes`;
 
@@ -2216,7 +2546,7 @@
                     let targetName = 'Sem Mapeamento';
                     
                     if (linkedSisKey) {
-                        // Não deve chegar aqui se o filtro estiver correto
+                        
                     } else if (suggestedSisKey) {
                          targetName = allUniqueLocations.sis.get(suggestedSisKey)?.local || 'Desconhecido';
                          badge = `<span class="status-badge bg-yellow-200 text-yellow-800 ml-2">Sugestão: ${targetName}</span>`;
@@ -2224,7 +2554,6 @@
                          badge = `<span class="status-badge bg-gray-200 text-gray-700 ml-2">Sem Vínculo</span>`;
                     }
                     
-                    // REQ 2: Exibe o local mapeado/sugerido ao lado do local de origem (na mesma caixa)
                     li.innerHTML = `
                         <div class="font-semibold text-base">${loc.local}</div>
                         <div class="text-xs text-gray-500 mt-1">
@@ -2236,7 +2565,6 @@
                 });
             }
 
-            // 6. Renderiza lista de Sistema (Destino) - AGORA SÓ MOSTRA OS RESTANTES
              if (remainingSis.length === 0) {
                  sisList.innerHTML = '<li class="text-gray-500 italic p-3">Todos os locais do Sistema desta unidade foram mapeados como destino.</li>';
             } else {
@@ -2255,7 +2583,6 @@
             }
         }
 
-        // Tenta encontrar a melhor correspondência
         function autoMapLocations(invLocs, sisLocs) {
             const suggestions = new Map();
             const sisNormMap = new Map(sisLocs.map(loc => [normalizeString(loc.local), loc.key]));
@@ -2263,21 +2590,17 @@
             invLocs.forEach(invLoc => {
                 const normInv = normalizeString(invLoc.local);
                 if (sisNormMap.has(normInv)) {
-                    // Mapeamento exato (sugestão forte)
                     suggestions.set(invLoc.key, sisNormMap.get(normInv));
                 }
             });
             return suggestions;
         }
 
-        // REQ 1: Clica no local do Inventário (Esquerda) para auditar
         function selectLocalForAuditing(event, invKey) {
             currentAuditedInvKey = invKey;
             
-            // 1. Remove seleção anterior de AMBAS as listas
             document.querySelectorAll('#local-linking-modal .location-selected').forEach(el => el.classList.remove('location-selected'));
             
-            // 2. Seleciona o item do inventário
             const invLi = event.target.closest('li');
             invLi.classList.add('location-selected');
 
@@ -2288,11 +2611,9 @@
             const invLoc = allUniqueLocations.inv.get(invKey);
             statusText.textContent = `Auditando: ${invLoc.local}`;
             
-            // 3. Habilita botões
             btnConfirm.disabled = false;
-            btnRemove.disabled = !locationLinks.has(invKey); // Só remove se já houver um link salvo
+            btnRemove.disabled = !locationLinks.has(invKey); 
 
-            // 4. Tenta destacar a sugestão ou o link salvo no Sistema (Direita)
             const linkedSisKey = locationLinks.get(invKey) || autoMapSuggestions.get(invKey);
             
             if (linkedSisKey) {
@@ -2303,26 +2624,21 @@
             }
         }
         
-        // REQ 1: Clica no local do Sistema (Direita) para mapear
         function selectLocalForMapping(event, sisKey) {
              const sisLi = event.target.closest('li');
              
-             // Só permite seleção se um local de inventário estiver sendo auditado
              if (!currentAuditedInvKey) return; 
 
-             // Remove seleção anterior (apenas na lista do sistema)
              document.querySelectorAll('#local-sis-list .location-selected').forEach(el => el.classList.remove('location-selected'));
              
              sisLi.classList.add('location-selected');
 
-            // Atualiza o status
             const statusText = document.getElementById('current-local-status');
             const invLoc = allUniqueLocations.inv.get(currentAuditedInvKey);
             const sisLoc = allUniqueLocations.sis.get(sisKey);
             statusText.textContent = `Pronto para VINCULAR: ${invLoc.local} ➔ ${sisLoc.local}`;
         }
 
-        // REQ 1: Confirma o vínculo (clicando no botão "Confirmar")
         function confirmLocalLink() {
             if (!currentAuditedInvKey) {
                 showCustomAlert("⚠️ Selecione um local do Inventário primeiro.");
@@ -2349,16 +2665,13 @@
             
             showCustomAlert(`✅ Vínculo de Local criado/confirmado!\n📋 ${invLoc.local} ➔ ⚙️ ${sisLoc.local}`);
             
-            // REQ 1: Atualiza a lista no modal para refletir o novo link (sumir o local)
             setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
-            // Reseta o painel de status
             currentAuditedInvKey = null;
             document.getElementById('current-local-status').textContent = 'Selecione um local do Inventário para auditar.';
             document.getElementById('btn-confirm-local').disabled = true;
             document.getElementById('btn-remove-local').disabled = true;
         }
 
-        // REQ 1: Remove o vínculo
         function removeLocalLink() {
             if (!currentAuditedInvKey) {
                 showCustomAlert("⚠️ Selecione um local do Inventário primeiro.");
@@ -2376,9 +2689,7 @@
             const invLoc = allUniqueLocations.inv.get(currentAuditedInvKey);
             showCustomAlert(`✅ Vínculo removido para: ${invLoc.local}`);
 
-            // REQ 1: Atualiza a lista no modal
             setupLocalLinkingModal(document.getElementById('local-unit-filter').value);
-            // Reseta o painel de status
             currentAuditedInvKey = null;
             document.getElementById('current-local-status').textContent = 'Selecione um local do Inventário para auditar.';
             document.getElementById('btn-confirm-local').disabled = true;
@@ -2399,8 +2710,6 @@
             }, 300);
         }
         
-        // === GERENCIADOR DE LINKS ===
-
         function toggleLinkManager() {
             const modal = document.getElementById('link-manager-modal');
             const modalContent = modal.querySelector('.modal-content');
